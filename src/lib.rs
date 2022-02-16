@@ -1,44 +1,67 @@
 // Copyright 2022 Martin Pool.
 
-//! Manage a console/terminal UI that can alternate between showing a progress bar
-//! and lines of text output.
+//! Manage a console/terminal UI that can alternate between showing a progress
+//! bar and lines of text output.
 //!
-//! By contrast to other Rust progress-bar libraries, `steady_progress`
-//! defers drawing the progress bar to the calling application, which can
-//! draw whatever information it wants, however it wants.
+//! **NOTE:** Nothing is implemented yet: this is only a sketch of an API.
+//!
+//! ## Concept
+//!
+//! By contrast to other Rust progress-bar libraries, Nutmeg has no
+//! built-in concept of what the progress bar or indicator should look like:
+//! this is entirely under the control of the application. Nutmeg handles
+//! drawing the application's progress bar to the screen and removing it as needed.
 //!
 //! The application (or dependent library) is responsible for:
-//! * Defining a type that implements [State], which holds whatever
-//!   information is relevant to drawing progress.
-//! * Defining how to render that information into some text lines,
-//!   by implementing [State::render].
-//! * Constructing a [View].
+//!
+//! * Defining a type that implements [State], which holds whatever information
+//!   is relevant to drawing progress.
+//! * Defining how to render that information into some text lines, by
+//!   implementing [State::render].
+//! * Constructing a [View] that will draw progress to the terminal.
 //! * Notifying the [View] when there are state updates, by calling
 //!   [View::update].
+//! * While a [View] is in use, all text written to stdout/stderr should be sent
+//!   via that view, to avoid the display getting scrambled.
 //!
-//! This library is responsible for:
-//! * Periodically drawing the progress bar.
+//! The Nutmeg library is responsible for:
+//!
+//! * Periodically drawing the progress bar in response to updates, including
+//!   * Horizontally truncating output to fit on the screen.
+//!   * Handling changes in the number of lines of progress display.
 //! * Removing the progress bar when the view is finished or dropped.
-//! * Coordinating to hide the bar to print text output, and restore
-//!   it afterwards.
+//! * Coordinating to hide the bar to print text output, and restore it
+//!   afterwards.
 //! * Limiting the rate at which updates are drawn to the screen.
 //!
 //! Errors in writing to the terminal are discarded.
+//!
+//! ## Potential future features
+//!
+//! * Draw updates from a background thread, so that it will keep ticking even
+//!   if not actively updated, and to better handle applications that send a
+//!   burst of updates followed by a long pause. The background thread will
+//!   eventually paint the last drawn update.
 
-// TODO: Maybe, later, draw from a background thread, so that it will
-// keep ticking even if not actively updated...
+#![warn(missing_docs)]
 
 use std::borrow::Cow;
 use std::io::Write;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 use std::time::Duration;
 
+/// An application-defined type that holds whatever state is relevant to the
+/// progress bar, and that can render it into one or more lines of text.
 pub trait State {
     /// Render this state into a sequence of lines.
     ///
     /// Each line should be no more than `width` columns as displayed.
+    /// If they are longer, they will be truncated.
     ///
     /// The returned lines should not include `\n` characters.
+    ///
+    // TODO: Perhaps give it a `Write` target to write strings to, rather than
+    // returning a Vec? Or just let it return a String?
     fn render(&self, width: usize) -> Vec<Cow<'_, str>>;
 }
 
@@ -51,28 +74,8 @@ pub trait State {
 /// The View may be shared freely across threads: it internally
 /// synchronizes updates.
 pub struct View<S: State, Out: Write> {
-    inner: Mutex<Inner<S, Out>>,
-}
-
-struct Inner<S: State, Out: Write> {
-    /// Current application state.
-    state: S,
-
-    /// Stream to write to the terminal.
-    out: Out,
-
-    /// True if the progress output is currently drawn to the screen.
-    progress_drawn: bool,
-
-    /// Number of lines the cursor is below the line where the progress bar
-    /// should next be drawn.
-    cursor_y: usize,
-
-    /// Target interval to repaint the progress bar.
-    update_interval: Duration,
-    // TODO: Remember if we've printed an incomplete line, and in that
-    // case don't draw progress until it's finished.
-    // TODO: Make this implement Write and forward to `print`?
+    inner: Mutex<InnerView<S, Out>>,
+    options: ViewOptions,
 }
 
 impl<S, Out> View<S, Out>
@@ -85,22 +88,18 @@ where
     /// `out` is typically either [std::io::stdout] or [std::io::stderr].
     ///
     /// `state` is the application-defined initial state.
-    pub fn new(out: Out, state: S) -> View<S, Out> {
-        let mut inner = Inner {
+    pub fn new(out: Out, state: S, options: ViewOptions) -> View<S, Out> {
+        let mut inner_view = InnerView {
             out,
             state,
             progress_drawn: false,
             cursor_y: 0,
-            update_interval: Duration::from_millis(250),
         };
-        inner.paint();
+        inner_view.paint();
         View {
-            inner: Mutex::new(inner),
+            inner: Mutex::new(inner_view),
+            options,
         }
-    }
-
-    fn lock_inner<'s, 'a: 's>(&'s self) -> MutexGuard<'a, Inner<S, Out>> {
-        self.inner.lock().unwrap()
     }
 
     /// Erase the progress bar from the screen and conclude.
@@ -122,9 +121,9 @@ where
 
     /// Update the state, and queue a redraw of the screen for later.
     pub fn update(&self, update_fn: fn(&mut S) -> ()) {
-        let mut inner = self.inner.lock().unwrap();
-        update_fn(&mut inner.state);
-        inner.paint();
+        let mut inner_view = self.inner.lock().unwrap();
+        update_fn(&mut inner_view.state);
+        inner_view.paint();
         todo!()
     }
 
@@ -134,29 +133,63 @@ where
     /// `text` should contain a trailing newline.
     pub fn print(&mut self, text: &str) {
         self.hide();
+        let _ = text;
         todo!("print");
-    }
-
-    /// Set the target interval at which to repaint the progress bar.
-    pub fn set_update_interval(&mut self, update_interval: Duration) {
-        self.inner.lock().unwrap().update_interval = update_interval;
-        // TODO: Perhaps, wake up the thread.
-    }
-
-    /// Set how long to wait after printing before drawing the progress
-    /// bar again.
-    pub fn set_print_holdoff(&mut self, holdoff: Duration) {
-        todo!()
     }
 
     /// Hide the progress bar if it's currently drawn.
     pub fn hide(&self) {
-        todo!();
+        todo!("hide");
     }
 }
 
-impl<S: State, Out: Write> Inner<S, Out> {
+/// The real contents of a View, inside a mutex.
+struct InnerView<S: State, Out: Write> {
+    /// Current application state.
+    state: S,
+
+    /// Stream to write to the terminal.
+    out: Out,
+
+    /// True if the progress output is currently drawn to the screen.
+    progress_drawn: bool,
+
+    /// Number of lines the cursor is below the line where the progress bar
+    /// should next be drawn.
+    cursor_y: usize,
+    // TODO: Remember if we've printed an incomplete line, and in that
+    // case don't draw progress until it's finished.
+    // TODO: Make this implement Write and forward to `print`?
+}
+
+impl<S: State, Out: Write> InnerView<S, Out> {
     fn paint(&mut self) {
         todo!()
+    }
+}
+
+/// Options controlling a View.
+///
+/// These are supplied to [View::new] and cannot be changed after the view is created.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewOptions {
+    /// Target interval to repaint the progress bar.
+    pub update_interval: Duration,
+
+    /// How long to wait after printing output before drawing the progress bar again.
+    pub print_holdoff: Duration,
+
+    /// Is the progress bar drawn at all?
+    pub progress_enabled: bool,
+}
+
+impl Default for ViewOptions {
+    fn default() -> ViewOptions {
+        ViewOptions {
+            update_interval: Duration::from_millis(250),
+            print_holdoff: Duration::from_millis(250),
+            progress_enabled: true,
+        }
     }
 }
