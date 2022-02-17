@@ -168,6 +168,8 @@ struct InnerView<S: State, Out: Write> {
     out: Out,
 
     /// True if the progress output is currently drawn to the screen.
+    // TODO: Maybe make this an actual state machine where drawing depends
+    // on the state enum?
     progress_drawn: bool,
 
     // /// Number of lines the cursor is below the line where the progress bar
