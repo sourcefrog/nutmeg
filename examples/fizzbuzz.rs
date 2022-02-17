@@ -1,5 +1,4 @@
-//! Example of the simplest case: just printing message, no actual
-//! progress bar.
+//! Example of mixing progress updates with printed output.
 
 use std::io::Write;
 use std::thread;

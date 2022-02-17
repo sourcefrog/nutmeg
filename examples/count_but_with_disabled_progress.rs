@@ -1,5 +1,5 @@
-//! Example of the simplest case: just printing message, no actual
-//! progress bar.
+//! Example that when the progress bar is disabled, the app can still 
+//! call `View::update` but nothing is drawn.
 
 #[allow(unused_imports)]
 use std::io::Write;

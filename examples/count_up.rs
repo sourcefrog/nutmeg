@@ -1,5 +1,4 @@
-//! Example of the simplest case: just printing message, no actual
-//! progress bar.
+//! Example of a simple progress bar that counts up.
 
 use std::thread::sleep;
 use std::time::Duration;
