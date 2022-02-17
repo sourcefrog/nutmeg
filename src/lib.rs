@@ -201,8 +201,8 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
         let mut rendered = Vec::new();
-        let width = 80; // TODO: Get the right width.
-        
+        let width = terminal::size()?.0 as usize;
+
         self.state.render(width, &mut rendered);
         // Trim any trailing newline
         if rendered.last() == Some(&b'\n') {
