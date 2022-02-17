@@ -20,7 +20,8 @@
 //! * Notifying the [View] when there are state updates, by calling
 //!   [View::update].
 //! * While a [View] is in use, all text written to stdout/stderr should be sent
-//!   via that view, to avoid the display getting scrambled.
+//!   via that view, to avoid the display getting scrambled. That is to say,
+//!   use `writeln!(view, "hello")` rather than `println!("hello")`.
 //!
 //! The Nutmeg library is responsible for:
 //!
@@ -48,7 +49,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use crossterm::terminal::ClearType;
-use crossterm::{cursor, queue, terminal, QueueableCommand};
+use crossterm::{cursor, queue, terminal};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -100,7 +101,6 @@ where
             options,
         };
         // Should we paint now, or wait for the first update? Maybe we'll just wait...
-        // inner_view.paint();
         View {
             inner: Mutex::new(inner_view),
         }
@@ -127,17 +127,17 @@ where
 
     /// Hide the progress bar if it's currently drawn.
     pub fn hide(&self) {
-        self.inner.lock().unwrap().hide()
+        self.inner.lock().unwrap().hide().expect("failed to hide progress bar")
     }
 }
 
-impl<S: State, Out: Write> std::io::Write for View<S, Out> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+impl<S: State, Out: Write> io::Write for View<S, Out> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
         }
         let mut inner = self.inner.lock().unwrap();
-        inner.hide();
+        inner.hide()?;
         if !buf.ends_with(b"\n") {
             inner.incomplete_line = true;
         }
@@ -154,7 +154,7 @@ impl<S: State, Out: Write> Drop for View<S, Out> {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
         if let Some(mut inner) = self.inner.try_lock().ok() {
-            inner.hide()
+            let _ = inner.hide();
         }
     }
 }
@@ -188,7 +188,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         }
         // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
-        self.hide();
+        self.hide()?;
         let mut rendered = Vec::new();
         let width = 80; // TODO: Get the right width.
         self.state.render(width, &mut rendered);
@@ -202,7 +202,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
             "multi-line progress is not implemented yet"
         );
 
-        queue!(self.out, cursor::MoveToColumn(1))?;
+        queue!(self.out, cursor::MoveToColumn(1), terminal::DisableLineWrap)?;
         self.out.write(&rendered)?;
         queue!(self.out, terminal::Clear(ClearType::UntilNewLine))?;
         self.out.flush()?;
@@ -215,16 +215,17 @@ impl<S: State, Out: Write> InnerView<S, Out> {
 
     /// Clear the progress bars off the screen, leaving it ready to
     /// print other output.
-    fn hide(&mut self) {
+    fn hide(&mut self) -> io::Result<()> {
         if self.progress_drawn {
             // todo!("move up the right number of lines then clear downwards, then update state");
-            self.out
-                .queue(terminal::Clear(terminal::ClearType::CurrentLine))
-                .expect("clear line")
-                .queue(cursor::MoveToColumn(1))
-                .expect("move to start of line");
+            queue!(
+            self.out,
+            terminal::Clear(terminal::ClearType::CurrentLine),
+cursor::MoveToColumn(1),
+terminal::EnableLineWrap)?;
             self.progress_drawn = false;
         }
+        Ok(())
     }
 
     fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()>{
