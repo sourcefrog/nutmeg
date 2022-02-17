@@ -41,10 +41,13 @@
 //!   if not actively updated, and to better handle applications that send a
 //!   burst of updates followed by a long pause. The background thread will
 //!   eventually paint the last drawn update.
+//!
+//! * Also set the window title from the progress state, perhaps by a different
+//!   render function?
 
 #![warn(missing_docs)]
 
-use std::io::{Write, self};
+use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -122,12 +125,20 @@ where
 
     /// Update the state, and queue a redraw of the screen for later.
     pub fn update(&self, update_fn: fn(&mut S) -> ()) {
-        self.inner.lock().unwrap().update(update_fn).expect("progress update failed")
+        self.inner
+            .lock()
+            .unwrap()
+            .update(update_fn)
+            .expect("progress update failed")
     }
 
     /// Hide the progress bar if it's currently drawn.
     pub fn hide(&self) {
-        self.inner.lock().unwrap().hide().expect("failed to hide progress bar")
+        self.inner
+            .lock()
+            .unwrap()
+            .hide()
+            .expect("failed to hide progress bar")
     }
 }
 
@@ -175,7 +186,6 @@ struct InnerView<S: State, Out: Write> {
     // /// Number of lines the cursor is below the line where the progress bar
     // /// should next be drawn.
     // cursor_y: usize,
-
     /// True if there's an incomplete line of output printed, and the
     /// progress bar can't be drawn until it's completed.
     incomplete_line: bool,
@@ -204,7 +214,11 @@ impl<S: State, Out: Write> InnerView<S, Out> {
             "multi-line progress is not implemented yet"
         );
 
-        queue!(self.out, cursor::MoveToColumn(1), terminal::DisableLineWrap)?;
+        queue!(
+            self.out,
+            cursor::MoveToColumn(1),
+            terminal::DisableLineWrap
+        )?;
         self.out.write(&rendered)?;
         queue!(self.out, terminal::Clear(ClearType::UntilNewLine))?;
         self.out.flush()?;
@@ -221,16 +235,17 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         if self.progress_drawn {
             // todo!("move up the right number of lines then clear downwards, then update state");
             queue!(
-            self.out,
-            terminal::Clear(terminal::ClearType::CurrentLine),
-cursor::MoveToColumn(1),
-terminal::EnableLineWrap)?;
+                self.out,
+                terminal::Clear(terminal::ClearType::CurrentLine),
+                cursor::MoveToColumn(1),
+                terminal::EnableLineWrap
+            )?;
             self.progress_drawn = false;
         }
         Ok(())
     }
 
-    fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()>{
+    fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()> {
         update_fn(&mut self.state);
         self.paint_progress()
     }
