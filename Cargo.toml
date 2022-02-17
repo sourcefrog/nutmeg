@@ -9,3 +9,4 @@ repository = "https://github.com/sourcefrog/nutmeg"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+crossterm = "0.23"

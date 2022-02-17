@@ -49,6 +49,8 @@ use std::io::Write;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use crossterm::{cursor, terminal, QueueableCommand};
+
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
 pub trait State {
@@ -58,8 +60,9 @@ pub trait State {
     /// If they are longer, they will be truncated.
     ///
     /// The rendered version may contain ANSI escape sequences for coloring, etc.
-    // TODO: Perhaps give it a `Write` target to write strings to, rather than
-    // returning a Vec? Or just let it return a String?
+    ///
+    /// Lines are separarated by `\n` and there may optionally be a final
+    /// newline.
     fn render<W: Write>(&self, width: usize, write_to: &mut W);
 }
 
@@ -76,7 +79,6 @@ pub trait State {
 /// [std::writeln] to print non-progress output lines.
 pub struct View<S: State, Out: Write> {
     inner: Mutex<InnerView<S, Out>>,
-    options: ViewOptions,
 }
 
 impl<S, Out> View<S, Out>
@@ -96,12 +98,12 @@ where
             progress_drawn: false,
             cursor_y: 0,
             incomplete_line: false,
+            options,
         };
         // Should we paint now, or wait for the first update? Maybe we'll just wait...
         // inner_view.paint();
         View {
             inner: Mutex::new(inner_view),
-            options,
         }
     }
 
@@ -176,15 +178,23 @@ struct InnerView<S: State, Out: Write> {
     /// True if there's an incomplete line of output printed, and the
     /// progress bar can't be drawn until it's completed.
     incomplete_line: bool,
+
+    options: ViewOptions,
 }
 
 impl<S: State, Out: Write> InnerView<S, Out> {
     fn paint_progress(&mut self) {
+        if !self.options.progress_enabled {
+            return;
+        }
         // TODO: Move up over any existing progress bar.
+        // TODO: Throttle, and keep track of the last update.
+        self.hide();
         let mut rendered = Vec::new();
         let width = 80; // TODO: Get the right width.
         self.state.render(width, &mut rendered);
         self.out.write(&rendered).expect("write progress to output");
+        self.progress_drawn = true;
         // TODO: Count lines.
         // TODO: Turn off line wrap; write one line at a time and erase to EOL; finally erase downwards.
     }
@@ -193,15 +203,20 @@ impl<S: State, Out: Write> InnerView<S, Out> {
     /// print other output.
     fn hide(&mut self) {
         if self.progress_drawn {
-            todo!("move up the right number of lines then clear downwards, then update state");
+            // todo!("move up the right number of lines then clear downwards, then update state");
+            self.out
+                .queue(terminal::Clear(terminal::ClearType::CurrentLine))
+                .expect("clear line")
+                .queue(cursor::MoveToColumn(0))
+                .expect("move to start of line");
             self.progress_drawn = false;
         }
     }
 
-     fn update(&mut self, update_fn: fn(&mut S) -> ()) {
-         update_fn(&mut self.state);
-         self.paint_progress()
-     }
+    fn update(&mut self, update_fn: fn(&mut S) -> ()) {
+        update_fn(&mut self.state);
+        self.paint_progress()
+    }
 }
 
 /// Options controlling a View.
