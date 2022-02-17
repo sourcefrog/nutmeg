@@ -45,12 +45,12 @@
 
 #![warn(missing_docs)]
 
-use std::io::Write;
+use std::io::{Write, self};
 use std::sync::Mutex;
 use std::time::Duration;
 
 use crossterm::terminal::ClearType;
-use crossterm::{cursor, queue, style::Print, terminal, QueueableCommand};
+use crossterm::{cursor, queue, terminal, QueueableCommand};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -97,7 +97,7 @@ where
             out,
             state,
             progress_drawn: false,
-            cursor_y: 0,
+            // cursor_y: 0,
             incomplete_line: false,
             options,
         };
@@ -124,7 +124,7 @@ where
 
     /// Update the state, and queue a redraw of the screen for later.
     pub fn update(&self, update_fn: fn(&mut S) -> ()) {
-        self.inner.lock().unwrap().update(update_fn)
+        self.inner.lock().unwrap().update(update_fn).expect("progress update failed")
     }
 
     /// Hide the progress bar if it's currently drawn.
@@ -172,9 +172,9 @@ struct InnerView<S: State, Out: Write> {
     /// True if the progress output is currently drawn to the screen.
     progress_drawn: bool,
 
-    /// Number of lines the cursor is below the line where the progress bar
-    /// should next be drawn.
-    cursor_y: usize,
+    // /// Number of lines the cursor is below the line where the progress bar
+    // /// should next be drawn.
+    // cursor_y: usize,
 
     /// True if there's an incomplete line of output printed, and the
     /// progress bar can't be drawn until it's completed.
@@ -184,9 +184,9 @@ struct InnerView<S: State, Out: Write> {
 }
 
 impl<S: State, Out: Write> InnerView<S, Out> {
-    fn paint_progress(&mut self) {
+    fn paint_progress(&mut self) -> io::Result<()> {
         if !self.options.progress_enabled {
-            return;
+            return Ok(());
         }
         // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
@@ -204,14 +204,15 @@ impl<S: State, Out: Write> InnerView<S, Out> {
             "multi-line progress is not implemented yet"
         );
 
-        queue!(self.out, cursor::MoveToColumn(1));
-        self.out.write(&rendered).expect("write progress to output");
-        queue!(self.out, terminal::Clear(ClearType::UntilNewLine));
-        self.out.flush();
+        queue!(self.out, cursor::MoveToColumn(1))?;
+        self.out.write(&rendered)?;
+        queue!(self.out, terminal::Clear(ClearType::UntilNewLine))?;
+        self.out.flush()?;
 
         self.progress_drawn = true;
         // TODO: Count lines.
         // TODO: Turn off line wrap; write one line at a time and erase to EOL; finally erase downwards.
+        Ok(())
     }
 
     /// Clear the progress bars off the screen, leaving it ready to
@@ -228,7 +229,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         }
     }
 
-    fn update(&mut self, update_fn: fn(&mut S) -> ()) {
+    fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()>{
         update_fn(&mut self.state);
         self.paint_progress()
     }
