@@ -3,8 +3,6 @@
 //! Manage a console/terminal UI that can alternate between showing a progress
 //! bar and lines of text output.
 //!
-//! **NOTE:** Nothing is implemented yet: this is only a sketch of an API.
-//!
 //! ## Concept
 //!
 //! By contrast to other Rust progress-bar libraries, Nutmeg has no
@@ -34,7 +32,7 @@
 //!   afterwards.
 //! * Limiting the rate at which updates are drawn to the screen.
 //!
-//! Errors in writing to the terminal are discarded.
+//! Errors in writing to the terminal cause a panic.
 //!
 //! ## Potential future features
 //!
