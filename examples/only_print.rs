@@ -5,7 +5,7 @@ use std::io::Write;
 
 struct State{}
 
-impl nutmeg::State for State {
+impl nutmeg::Model for State {
     fn render<W: std::io::Write>(&self, _width: usize, _write_to: &mut W) {
         // Nothing to do, it never renders.
     }

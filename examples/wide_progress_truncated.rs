@@ -9,7 +9,7 @@ struct State {
     width: usize,
 }
 
-impl nutmeg::State for State {
+impl nutmeg::Model for State {
     fn render<W: std::io::Write>(&self, _width: usize, write_to: &mut W) {
         write!(write_to, "i={} | ", self.i).unwrap();
         let ii = self.i % self.width;

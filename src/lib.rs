@@ -12,12 +12,12 @@
 //!
 //! The application (or dependent library) is responsible for:
 //!
-//! * Defining a type that implements [State], which holds whatever information
+//! * Defining a type that implements [Model], which holds whatever information
 //!   is relevant to drawing progress.
 //! * Defining how to render that information into some text lines, by
-//!   implementing [State::render].
+//!   implementing [Model::render].
 //! * Constructing a [View] that will draw progress to the terminal.
-//! * Notifying the [View] when there are state updates, by calling
+//! * Notifying the [View] when there are model updates, by calling
 //!   [View::update].
 //! * While a [View] is in use, all text written to stdout/stderr should be sent
 //!   via that view, to avoid the display getting scrambled. That is to say,
@@ -42,7 +42,7 @@
 //!   burst of updates followed by a long pause. The background thread will
 //!   eventually paint the last drawn update.
 //!
-//! * Also set the window title from the progress state, perhaps by a different
+//! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
 
 #![warn(missing_docs)]
@@ -56,8 +56,8 @@ use crossterm::{cursor, queue, terminal};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
-pub trait State {
-    /// Render this state into a sequence of one or more lines.
+pub trait Model {
+    /// Render this model into a sequence of one or more lines.
     ///
     /// Each line should be no more than `width` columns as displayed.
     /// If they are longer, they will be truncated.
@@ -80,24 +80,24 @@ pub trait State {
 ///
 /// The View implements [std::io::Write] and so can be used by e.g.
 /// [std::writeln] to print non-progress output lines.
-pub struct View<S: State, Out: Write> {
+pub struct View<S: Model, Out: Write> {
     inner: Mutex<InnerView<S, Out>>,
 }
 
 impl<S, Out> View<S, Out>
 where
-    S: State,
+    S: Model,
     Out: Write,
 {
     /// Construct a new progress view.
     ///
     /// `out` is typically `std::io::stdout.lock()`.
     ///
-    /// `state` is the application-defined initial state.
-    pub fn new(out: Out, state: S, options: ViewOptions) -> View<S, Out> {
+    /// `model` is the application-defined initial model.
+    pub fn new(out: Out, model: S, options: ViewOptions) -> View<S, Out> {
         let inner_view = InnerView {
             out,
-            state,
+            model,
             progress_drawn: false,
             // cursor_y: 0,
             incomplete_line: false,
@@ -123,7 +123,7 @@ where
         // Nothing to do; consuming it is enough?
     }
 
-    /// Update the state, and queue a redraw of the screen for later.
+    /// Update the model, and queue a redraw of the screen for later.
     pub fn update(&self, update_fn: fn(&mut S) -> ()) {
         self.inner
             .lock()
@@ -142,7 +142,7 @@ where
     }
 }
 
-impl<S: State, Out: Write> io::Write for View<S, Out> {
+impl<S: Model, Out: Write> io::Write for View<S, Out> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
@@ -160,7 +160,7 @@ impl<S: State, Out: Write> io::Write for View<S, Out> {
     }
 }
 
-impl<S: State, Out: Write> Drop for View<S, Out> {
+impl<S: Model, Out: Write> Drop for View<S, Out> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
@@ -171,9 +171,9 @@ impl<S: State, Out: Write> Drop for View<S, Out> {
 }
 
 /// The real contents of a View, inside a mutex.
-struct InnerView<S: State, Out: Write> {
-    /// Current application state.
-    state: S,
+struct InnerView<S: Model, Out: Write> {
+    /// Current application model.
+    model: S,
 
     /// Stream to write to the terminal.
     out: Out,
@@ -193,7 +193,7 @@ struct InnerView<S: State, Out: Write> {
     options: ViewOptions,
 }
 
-impl<S: State, Out: Write> InnerView<S, Out> {
+impl<S: Model, Out: Write> InnerView<S, Out> {
     fn paint_progress(&mut self) -> io::Result<()> {
         if !self.options.progress_enabled {
             return Ok(());
@@ -203,7 +203,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         let mut rendered = Vec::new();
         let width = terminal::size()?.0 as usize;
 
-        self.state.render(width, &mut rendered);
+        self.model.render(width, &mut rendered);
         // Trim any trailing newline
         if rendered.last() == Some(&b'\n') {
             rendered.truncate(rendered.len() - 1)
@@ -232,7 +232,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
     /// print other output.
     fn hide(&mut self) -> io::Result<()> {
         if self.progress_drawn {
-            // todo!("move up the right number of lines then clear downwards, then update state");
+            // todo!("move up the right number of lines then clear downwards, then update model");
             queue!(
                 self.out,
                 terminal::Clear(terminal::ClearType::CurrentLine),
@@ -245,7 +245,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
     }
 
     fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()> {
-        update_fn(&mut self.state);
+        update_fn(&mut self.model);
         self.paint_progress()
     }
 }

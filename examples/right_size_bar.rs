@@ -9,7 +9,7 @@ struct State {
     start_time: Instant,
 }
 
-impl nutmeg::State for State {
+impl nutmeg::Model for State {
     fn render<W: std::io::Write>(&self, width: usize, w: &mut W) {
         let start = format!("i={} | ", self.i);
         let end = format!(" | {:.3}s", self.start_time.elapsed().as_secs_f64());
