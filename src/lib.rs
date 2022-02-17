@@ -60,7 +60,7 @@ pub trait State {
     /// The rendered version may contain ANSI escape sequences for coloring, etc.
     // TODO: Perhaps give it a `Write` target to write strings to, rather than
     // returning a Vec? Or just let it return a String?
-    fn render<W: Write>(&self, width: usize, write_to: W);
+    fn render<W: Write>(&self, width: usize, write_to: &mut W);
 }
 
 /// A view that draws and coordinates a progress bar on the terminal.
@@ -90,7 +90,7 @@ where
     ///
     /// `state` is the application-defined initial state.
     pub fn new(out: Out, state: S, options: ViewOptions) -> View<S, Out> {
-        let mut inner_view = InnerView {
+        let inner_view = InnerView {
             out,
             state,
             progress_drawn: false,
@@ -107,9 +107,7 @@ where
 
     /// Erase the progress bar from the screen and conclude.
     pub fn finish(self) {
-        // TODO: Also do this from Drop.
         self.hide();
-        todo!()
     }
 
     /// Stop updating, without necessarily removing any currently visible
@@ -119,15 +117,11 @@ where
         // hide it.
         self.inner.lock().unwrap().progress_drawn = false;
         // Nothing to do; consuming it is enough?
-        // TODO: Something to stop Drop trying to erase it?
     }
 
     /// Update the state, and queue a redraw of the screen for later.
     pub fn update(&self, update_fn: fn(&mut S) -> ()) {
-        let mut inner_view = self.inner.lock().unwrap();
-        update_fn(&mut inner_view.state);
-        inner_view.paint();
-        todo!()
+        self.inner.lock().unwrap().update(update_fn)
     }
 
     /// Hide the progress bar if it's currently drawn.
@@ -150,7 +144,17 @@ impl<S: State, Out: Write> std::io::Write for View<S, Out> {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        todo!()
+        Ok(())
+    }
+}
+
+impl<S: State, Out: Write> Drop for View<S, Out> {
+    fn drop(&mut self) {
+        // Only try lock here: don't hang if it's locked or panic
+        // if it's poisoned
+        if let Some(mut inner) = self.inner.try_lock().ok() {
+            inner.hide()
+        }
     }
 }
 
@@ -175,8 +179,14 @@ struct InnerView<S: State, Out: Write> {
 }
 
 impl<S: State, Out: Write> InnerView<S, Out> {
-    fn paint(&mut self) {
-        todo!()
+    fn paint_progress(&mut self) {
+        // TODO: Move up over any existing progress bar.
+        let mut rendered = Vec::new();
+        let width = 80; // TODO: Get the right width.
+        self.state.render(width, &mut rendered);
+        self.out.write(&rendered).expect("write progress to output");
+        // TODO: Count lines.
+        // TODO: Turn off line wrap; write one line at a time and erase to EOL; finally erase downwards.
     }
 
     /// Clear the progress bars off the screen, leaving it ready to
@@ -187,6 +197,11 @@ impl<S: State, Out: Write> InnerView<S, Out> {
             self.progress_drawn = false;
         }
     }
+
+     fn update(&mut self, update_fn: fn(&mut S) -> ()) {
+         update_fn(&mut self.state);
+         self.paint_progress()
+     }
 }
 
 /// Options controlling a View.

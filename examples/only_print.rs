@@ -6,7 +6,7 @@ use std::io::Write;
 struct State{}
 
 impl nutmeg::State for State {
-    fn render<W: std::io::Write>(&self, _width: usize, _write_to: W) {
+    fn render<W: std::io::Write>(&self, _width: usize, _write_to: &mut W) {
         // Nothing to do, it never renders.
     }
 }
