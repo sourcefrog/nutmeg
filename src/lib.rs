@@ -49,7 +49,8 @@ use std::io::Write;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crossterm::{cursor, terminal, QueueableCommand};
+use crossterm::terminal::ClearType;
+use crossterm::{cursor, queue, style::Print, terminal, QueueableCommand};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -193,7 +194,21 @@ impl<S: State, Out: Write> InnerView<S, Out> {
         let mut rendered = Vec::new();
         let width = 80; // TODO: Get the right width.
         self.state.render(width, &mut rendered);
+
+        // Trim any trailing newline
+        if rendered.last() == Some(&b'\n') {
+            rendered.truncate(rendered.len() - 1)
+        }
+        assert!(
+            !rendered.contains(&b'\n'),
+            "multi-line progress is not implemented yet"
+        );
+
+        queue!(self.out, cursor::MoveToColumn(1));
         self.out.write(&rendered).expect("write progress to output");
+        queue!(self.out, terminal::Clear(ClearType::UntilNewLine));
+        self.out.flush();
+
         self.progress_drawn = true;
         // TODO: Count lines.
         // TODO: Turn off line wrap; write one line at a time and erase to EOL; finally erase downwards.
@@ -207,7 +222,7 @@ impl<S: State, Out: Write> InnerView<S, Out> {
             self.out
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))
                 .expect("clear line")
-                .queue(cursor::MoveToColumn(0))
+                .queue(cursor::MoveToColumn(1))
                 .expect("move to start of line");
             self.progress_drawn = false;
         }
