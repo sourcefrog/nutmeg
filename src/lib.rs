@@ -45,7 +45,6 @@
 
 #![warn(missing_docs)]
 
-use std::borrow::Cow;
 use std::io::Write;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -53,16 +52,15 @@ use std::time::Duration;
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
 pub trait State {
-    /// Render this state into a sequence of lines.
+    /// Render this state into a sequence of one or more lines.
     ///
     /// Each line should be no more than `width` columns as displayed.
     /// If they are longer, they will be truncated.
     ///
-    /// The returned lines should not include `\n` characters.
-    ///
+    /// The rendered version may contain ANSI escape sequences for coloring, etc.
     // TODO: Perhaps give it a `Write` target to write strings to, rather than
     // returning a Vec? Or just let it return a String?
-    fn render(&self, width: usize) -> Vec<Cow<'_, str>>;
+    fn render<W: Write>(&self, width: usize, write_to: W);
 }
 
 /// A view that draws and coordinates a progress bar on the terminal.
@@ -73,6 +71,9 @@ pub trait State {
 ///
 /// The View may be shared freely across threads: it internally
 /// synchronizes updates.
+///
+/// The View implements [std::io::Write] and so can be used by e.g.
+/// [std::writeln] to print non-progress output lines.
 pub struct View<S: State, Out: Write> {
     inner: Mutex<InnerView<S, Out>>,
     options: ViewOptions,
@@ -85,7 +86,7 @@ where
 {
     /// Construct a new progress view.
     ///
-    /// `out` is typically either [std::io::stdout] or [std::io::stderr].
+    /// `out` is typically `std::io::stdout.lock()`.
     ///
     /// `state` is the application-defined initial state.
     pub fn new(out: Out, state: S, options: ViewOptions) -> View<S, Out> {
@@ -94,8 +95,10 @@ where
             state,
             progress_drawn: false,
             cursor_y: 0,
+            incomplete_line: false,
         };
-        inner_view.paint();
+        // Should we paint now, or wait for the first update? Maybe we'll just wait...
+        // inner_view.paint();
         View {
             inner: Mutex::new(inner_view),
             options,
@@ -127,19 +130,27 @@ where
         todo!()
     }
 
-    /// Temporarily remove the progress bar, if necessary, and then print
-    /// text to the console.
-    ///
-    /// `text` should contain a trailing newline.
-    pub fn print(&mut self, text: &str) {
-        self.hide();
-        let _ = text;
-        todo!("print");
-    }
-
     /// Hide the progress bar if it's currently drawn.
     pub fn hide(&self) {
-        todo!("hide");
+        self.inner.lock().unwrap().hide()
+    }
+}
+
+impl<S: State, Out: Write> std::io::Write for View<S, Out> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        let mut inner = self.inner.lock().unwrap();
+        inner.hide();
+        if !buf.ends_with(b"\n") {
+            inner.incomplete_line = true;
+        }
+        inner.out.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        todo!()
     }
 }
 
@@ -157,14 +168,24 @@ struct InnerView<S: State, Out: Write> {
     /// Number of lines the cursor is below the line where the progress bar
     /// should next be drawn.
     cursor_y: usize,
-    // TODO: Remember if we've printed an incomplete line, and in that
-    // case don't draw progress until it's finished.
-    // TODO: Make this implement Write and forward to `print`?
+
+    /// True if there's an incomplete line of output printed, and the
+    /// progress bar can't be drawn until it's completed.
+    incomplete_line: bool,
 }
 
 impl<S: State, Out: Write> InnerView<S, Out> {
     fn paint(&mut self) {
         todo!()
+    }
+
+    /// Clear the progress bars off the screen, leaving it ready to
+    /// print other output.
+    fn hide(&mut self) {
+        if self.progress_drawn {
+            todo!("move up the right number of lines then clear downwards, then update state");
+            self.progress_drawn = false;
+        }
     }
 }
 
