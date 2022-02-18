@@ -15,7 +15,8 @@
 //! * Defining a type that implements [Model], which holds whatever information
 //!   is relevant to drawing progress.
 //! * Defining how to render that information into some text lines, by
-//!   implementing [Model::render].
+//!   implementing [Model::render]. This returns a `String` for the progress
+//!   representation, optionally including ANSI styling.
 //! * Constructing a [View] that will draw progress to the terminal.
 //! * Notifying the [View] when there are model updates, by calling
 //!   [View::update].
@@ -52,21 +53,32 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use crossterm::terminal::ClearType;
-use crossterm::{cursor, queue, terminal};
+use crossterm::{cursor, queue, style, terminal};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
 pub trait Model {
-    /// Render this model into a sequence of one or more lines.
+    /// Render this model into a String to draw on the console.
     ///
     /// Each line should be no more than `width` columns as displayed.
     /// If they are longer, they will be truncated.
     ///
-    /// The rendered version may contain ANSI escape sequences for coloring, etc.
+    /// The rendered version may contain ANSI escape sequences for coloring,
+    /// etc, but should not move the cursor.
     ///
     /// Lines are separarated by `\n` and there may optionally be a final
     /// newline.
-    fn render<W: Write>(&self, width: usize, write_to: &mut W);
+    /// 
+    /// ```
+    /// struct Model { i: usize, total: usize }
+    /// 
+    /// impl nutmeg::Model for Model {
+    ///     fn render(&self, _width: usize) -> String {
+    ///         format!("phase {}/{}", self.i, self.total)
+    ///     }
+    /// }
+    /// ```
+    fn render(&self, width: usize) -> String;
 }
 
 /// A view that draws and coordinates a progress bar on the terminal.
@@ -200,26 +212,23 @@ impl<S: Model, Out: Write> InnerView<S, Out> {
         }
         // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
-        let mut rendered = Vec::new();
         let width = terminal::size()?.0 as usize;
 
-        self.model.render(width, &mut rendered);
-        // Trim any trailing newline
-        if rendered.last() == Some(&b'\n') {
-            rendered.truncate(rendered.len() - 1)
-        }
+        let rendered = self.model.render(width);
+        // Remove exactly one trailing newline, if there is one.
+        let rendered = rendered.strip_suffix("\n").unwrap_or(&rendered);
         assert!(
-            !rendered.contains(&b'\n'),
+            !rendered.contains('\n'),
             "multi-line progress is not implemented yet"
         );
 
         queue!(
             self.out,
             cursor::MoveToColumn(1),
-            terminal::DisableLineWrap
+            terminal::DisableLineWrap,
+            style::Print(rendered),
+            terminal::Clear(ClearType::UntilNewLine)
         )?;
-        self.out.write(&rendered)?;
-        queue!(self.out, terminal::Clear(ClearType::UntilNewLine))?;
         self.out.flush()?;
 
         self.progress_drawn = true;

@@ -4,27 +4,27 @@
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-struct State {
+struct Model {
     i: usize,
     start_time: Instant,
 }
 
-impl nutmeg::Model for State {
-    fn render<W: std::io::Write>(&self, width: usize, w: &mut W) {
+impl nutmeg::Model for Model {
+    fn render(&self, width: usize) -> String {
         let start = format!("i={} | ", self.i);
         let end = format!(" | {:.3}s", self.start_time.elapsed().as_secs_f64());
         let fill_len = width - start.len() - end.len();
         let mut fill: Vec<u8> = vec![b'.'; fill_len];
         fill[self.i % fill_len] = b'~';
         let fill: String = String::from_utf8(fill).unwrap();
-        write!(w, "{start}{fill}{end}").unwrap();
+        format!("{start}{fill}{end}")
     }
 }
 
 fn main() {
     let stdout = std::io::stdout();
     let options = nutmeg::ViewOptions::default();
-    let state = State {
+    let state = Model {
         i: 0,
         start_time: Instant::now(),
     };

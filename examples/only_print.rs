@@ -3,17 +3,17 @@
 
 use std::io::Write;
 
-struct State{}
+struct Model {}
 
-impl nutmeg::Model for State {
-    fn render<W: std::io::Write>(&self, _width: usize, _write_to: &mut W) {
-        // Nothing to do, it never renders.
+impl nutmeg::Model for Model {
+    fn render(&self, _width: usize) -> String {
+        unreachable!("Model::render should never be called, since the progress bar is disabled");
     }
 }
 
 fn main() {
     let stdout = std::io::stdout();
-    let mut view = nutmeg::View::new(stdout, State{}, nutmeg::ViewOptions::default());
+    let mut view = nutmeg::View::new(stdout, Model {}, nutmeg::ViewOptions::default());
     for i in 1..=5 {
         writeln!(view, "write line {}", i).unwrap();
     }
