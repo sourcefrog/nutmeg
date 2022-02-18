@@ -269,6 +269,9 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 /// Options controlling a View.
 ///
 /// These are supplied to [View::new] and cannot be changed after the view is created.
+/// 
+/// The default options created by [ViewOptions::default] should be reasonable 
+/// for most applications.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ViewOptions {
@@ -279,10 +282,15 @@ pub struct ViewOptions {
     pub print_holdoff: Duration,
 
     /// Is the progress bar drawn at all?
+    /// 
+    /// This value will be ignored by [View::new] if stdout is not a terminal.
     pub progress_enabled: bool,
 }
 
 impl Default for ViewOptions {
+    /// Create default reasonable view options.
+    /// 
+    /// The update interval and print holdoff are 250ms, and the progress bar is enabled.
     fn default() -> ViewOptions {
         ViewOptions {
             update_interval: Duration::from_millis(250),
