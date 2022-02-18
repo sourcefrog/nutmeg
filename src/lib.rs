@@ -96,13 +96,13 @@ pub trait Model {
 ///
 /// The View implements [std::io::Write] and so can be used by e.g.
 /// [std::writeln] to print non-progress output lines.
-pub struct View<S: Model, Out: Write> {
-    inner: Mutex<InnerView<S, Out>>,
+pub struct View<M: Model, Out: Write> {
+    inner: Mutex<InnerView<M, Out>>,
 }
 
-impl<S, Out> View<S, Out>
+impl<M, Out> View<M, Out>
 where
-    S: Model,
+    M: Model,
     Out: Write,
 {
     /// Erase the progress bar from the screen and conclude.
@@ -120,7 +120,7 @@ where
     }
 
     /// Update the model, and queue a redraw of the screen for later.
-    pub fn update(&self, update_fn: fn(&mut S) -> ()) {
+    pub fn update(&self, update_fn: fn(&mut M) -> ()) {
         self.inner
             .lock()
             .unwrap()
@@ -138,11 +138,11 @@ where
     }
 }
 
-impl<S: Model> View<S, io::Stdout> {
+impl<M: Model> View<M, io::Stdout> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model.
-    pub fn new(model: S, mut options: ViewOptions) -> View<S, io::Stdout> {
+    pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
         let out = io::stdout();
         if !out.is_tty() {
             options.progress_enabled = false;
@@ -162,7 +162,7 @@ impl<S: Model> View<S, io::Stdout> {
     }
 }
 
-impl<S: Model, Out: Write> io::Write for View<S, Out> {
+impl<M: Model, Out: Write> io::Write for View<M, Out> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
@@ -180,7 +180,7 @@ impl<S: Model, Out: Write> io::Write for View<S, Out> {
     }
 }
 
-impl<S: Model, Out: Write> Drop for View<S, Out> {
+impl<M: Model, Out: Write> Drop for View<M, Out> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
@@ -191,9 +191,9 @@ impl<S: Model, Out: Write> Drop for View<S, Out> {
 }
 
 /// The real contents of a View, inside a mutex.
-struct InnerView<S: Model, Out: Write> {
+struct InnerView<M: Model, Out: Write> {
     /// Current application model.
-    model: S,
+    model: M,
 
     /// Stream to write to the terminal.
     out: Out,
@@ -213,7 +213,7 @@ struct InnerView<S: Model, Out: Write> {
     options: ViewOptions,
 }
 
-impl<S: Model, Out: Write> InnerView<S, Out> {
+impl<M: Model, Out: Write> InnerView<M, Out> {
     fn paint_progress(&mut self) -> io::Result<()> {
         if !self.options.progress_enabled {
             return Ok(());
@@ -240,8 +240,7 @@ impl<S: Model, Out: Write> InnerView<S, Out> {
         self.out.flush()?;
 
         self.progress_drawn = true;
-        // TODO: Count lines.
-        // TODO: Turn off line wrap; write one line at a time and erase to EOL; finally erase downwards.
+        // TODO: Count lines; write one line at a time and erase to EOL; finally erase downwards.
         Ok(())
     }
 
@@ -261,7 +260,7 @@ impl<S: Model, Out: Write> InnerView<S, Out> {
         Ok(())
     }
 
-    fn update(&mut self, update_fn: fn(&mut S) -> ()) -> io::Result<()> {
+    fn update(&mut self, update_fn: fn(&mut M) -> ()) -> io::Result<()> {
         update_fn(&mut self.model);
         self.paint_progress()
     }
