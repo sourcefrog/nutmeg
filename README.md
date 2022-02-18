@@ -12,15 +12,17 @@ drawing the application's progress bar to the screen and removing it as needed.
 
 The application (or dependent library) is responsible for:
 
-* Defining a type that implements [State], which holds whatever information
+* Defining a type that implements [Model], which holds whatever information
   is relevant to drawing progress.
 * Defining how to render that information into some text lines, by
-  implementing [State::render].
+  implementing [Model::render]. This returns a `String` for the progress
+  representation, optionally including ANSI styling.
 * Constructing a [View] that will draw progress to the terminal.
-* Notifying the [View] when there are state updates, by calling
+* Notifying the [View] when there are model updates, by calling
   [View::update].
 * While a [View] is in use, all text written to stdout/stderr should be sent
-  via that view, to avoid the display getting scrambled.
+  via that view, to avoid the display getting scrambled. That is to say,
+  use `writeln!(view, "hello")` rather than `println!("hello")`.
 
 The Nutmeg library is responsible for:
 
@@ -40,5 +42,8 @@ Errors in writing to the terminal cause a panic.
   if not actively updated, and to better handle applications that send a
   burst of updates followed by a long pause. The background thread will
   eventually paint the last drawn update.
+
+* Also set the window title from the progress model, perhaps by a different
+  render function?
 
 License: MIT
