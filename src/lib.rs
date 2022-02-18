@@ -184,7 +184,7 @@ impl<S: Model, Out: Write> Drop for View<S, Out> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
-        if let Some(mut inner) = self.inner.try_lock().ok() {
+        if let Ok(mut inner) = self.inner.try_lock() {
             let _ = inner.hide();
         }
     }
@@ -224,7 +224,7 @@ impl<S: Model, Out: Write> InnerView<S, Out> {
 
         let rendered = self.model.render(width);
         // Remove exactly one trailing newline, if there is one.
-        let rendered = rendered.strip_suffix("\n").unwrap_or(&rendered);
+        let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
         assert!(
             !rendered.contains('\n'),
             "multi-line progress is not implemented yet"
