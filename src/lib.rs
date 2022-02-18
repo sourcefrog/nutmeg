@@ -33,6 +33,7 @@
 //! * Coordinating to hide the bar to print text output, and restore it
 //!   afterwards.
 //! * Limiting the rate at which updates are drawn to the screen.
+//! * Disabling progress if stdout is not a terminal.
 //!
 //! Errors in writing to the terminal cause a panic.
 //!
@@ -56,7 +57,7 @@ use std::time::Duration;
 
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, queue, style, terminal};
-// use crossterm::tty::IsTty;
+use crossterm::tty::IsTty;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -141,9 +142,13 @@ impl<S: Model> View<S, io::Stdout> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model.
-    pub fn new(model: S, options: ViewOptions) -> View<S, io::Stdout> {
+    pub fn new(model: S, mut options: ViewOptions) -> View<S, io::Stdout> {
+        let out = io::stdout();
+        if !out.is_tty() {
+            options.progress_enabled = false;
+        }
         let inner_view = InnerView {
-            out: io::stdout(),
+            out,
             model,
             progress_drawn: false,
             // cursor_y: 0,
