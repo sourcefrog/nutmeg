@@ -22,13 +22,12 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let stdout = std::io::stdout();
     let options = nutmeg::ViewOptions::default();
     let state = Model {
         i: 0,
         start_time: Instant::now(),
     };
-    let view = nutmeg::View::new(stdout, state, options);
+    let view = nutmeg::View::new(state, options);
     for _ in 1..=120 {
         view.update(|state| state.i += 1);
         sleep(Duration::from_millis(100));

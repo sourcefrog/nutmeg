@@ -15,9 +15,8 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let stdout = std::io::stdout();
     let options = nutmeg::ViewOptions::default();
-    let mut view = nutmeg::View::new(stdout, Model { i: 0 }, options);
+    let mut view = nutmeg::View::new(Model { i: 0 }, options);
     for i in 1..=25 {
         view.update(|state| state.i += 1);
         if i % 15 == 0 {

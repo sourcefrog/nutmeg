@@ -14,9 +14,8 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let out = std::io::stdout();
     let options = nutmeg::ViewOptions::default();
-    let view = nutmeg::View::new(out, Model { i: 0 }, options);
+    let view = nutmeg::View::new(Model { i: 0 }, options);
     for _i in 1..=5 {
         view.update(|state| state.i += 1);
         sleep(Duration::from_millis(300));

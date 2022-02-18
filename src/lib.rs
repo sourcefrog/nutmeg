@@ -43,6 +43,8 @@
 //!   burst of updates followed by a long pause. The background thread will
 //!   eventually paint the last drawn update.
 //!
+//! * Write to an arbitrary `Write`, not just stdout?
+//!
 //! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
 
@@ -54,11 +56,12 @@ use std::time::Duration;
 
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, queue, style, terminal};
+// use crossterm::tty::IsTty;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
 pub trait Model {
-    /// Render this model into a String to draw on the console.
+    /// Render this model into a string to draw on the console.
     ///
     /// Each line should be no more than `width` columns as displayed.
     /// If they are longer, they will be truncated.
@@ -68,10 +71,10 @@ pub trait Model {
     ///
     /// Lines are separarated by `\n` and there may optionally be a final
     /// newline.
-    /// 
+    ///
     /// ```
     /// struct Model { i: usize, total: usize }
-    /// 
+    ///
     /// impl nutmeg::Model for Model {
     ///     fn render(&mut self, _width: usize) -> String {
     ///         format!("phase {}/{}", self.i, self.total)
@@ -101,26 +104,6 @@ where
     S: Model,
     Out: Write,
 {
-    /// Construct a new progress view.
-    ///
-    /// `out` is typically `std::io::stdout.lock()`.
-    ///
-    /// `model` is the application-defined initial model.
-    pub fn new(out: Out, model: S, options: ViewOptions) -> View<S, Out> {
-        let inner_view = InnerView {
-            out,
-            model,
-            progress_drawn: false,
-            // cursor_y: 0,
-            incomplete_line: false,
-            options,
-        };
-        // Should we paint now, or wait for the first update? Maybe we'll just wait...
-        View {
-            inner: Mutex::new(inner_view),
-        }
-    }
-
     /// Erase the progress bar from the screen and conclude.
     pub fn finish(self) {
         self.hide();
@@ -151,6 +134,26 @@ where
             .unwrap()
             .hide()
             .expect("failed to hide progress bar")
+    }
+}
+
+impl<S: Model> View<S, io::Stdout> {
+    /// Construct a new progress view, drawn to stdout.
+    ///
+    /// `model` is the application-defined initial model.
+    pub fn new(model: S, options: ViewOptions) -> View<S, io::Stdout> {
+        let inner_view = InnerView {
+            out: io::stdout(),
+            model,
+            progress_drawn: false,
+            // cursor_y: 0,
+            incomplete_line: false,
+            options,
+        };
+        // Should we paint now, or wait for the first update? Maybe we'll just wait...
+        View {
+            inner: Mutex::new(inner_view),
+        }
     }
 }
 
