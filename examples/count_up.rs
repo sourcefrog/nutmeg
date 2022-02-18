@@ -8,7 +8,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&self, _width: usize) -> String {
+    fn render(&mut self, _width: usize) -> String {
         format!("count: {}", self.i)
     }
 }

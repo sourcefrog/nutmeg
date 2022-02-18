@@ -73,12 +73,12 @@ pub trait Model {
     /// struct Model { i: usize, total: usize }
     /// 
     /// impl nutmeg::Model for Model {
-    ///     fn render(&self, _width: usize) -> String {
+    ///     fn render(&mut self, _width: usize) -> String {
     ///         format!("phase {}/{}", self.i, self.total)
     ///     }
     /// }
     /// ```
-    fn render(&self, width: usize) -> String;
+    fn render(&mut self, width: usize) -> String;
 }
 
 /// A view that draws and coordinates a progress bar on the terminal.

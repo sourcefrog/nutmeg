@@ -10,7 +10,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&self, width: usize) -> String {
+    fn render(&mut self, width: usize) -> String {
         let start = format!("i={} | ", self.i);
         let end = format!(" | {:.3}s", self.start_time.elapsed().as_secs_f64());
         let fill_len = width - start.len() - end.len();
