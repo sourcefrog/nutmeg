@@ -147,8 +147,10 @@ where
     M: Model,
     Out: Write,
 {
-    /// Stop updating, without necessarily removing any currently visible
-    /// progress.
+    /// Stop using this progress view.
+    ///
+    /// If the progress bar is currently visible, it will be left behind on the
+    /// screen.
     pub fn abandon(self) {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
@@ -195,7 +197,6 @@ impl<M: Model> View<M, io::Stdout> {
             incomplete_line: false,
             options,
         };
-        // Should we paint now, or wait for the first update? Maybe we'll just wait...
         View {
             inner: Mutex::new(inner_view),
         }
@@ -207,12 +208,7 @@ impl<M: Model, Out: Write> io::Write for View<M, Out> {
         if buf.is_empty() {
             return Ok(0);
         }
-        let mut inner = self.inner.lock().unwrap();
-        inner.hide()?;
-        if !buf.ends_with(b"\n") {
-            inner.incomplete_line = true;
-        }
-        inner.out.write(buf)
+        self.inner.lock().unwrap().write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -306,6 +302,14 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     {
         update_fn(&mut self.model);
         self.paint_progress()
+    }
+
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.hide()?;
+        if !buf.ends_with(b"\n") {
+            self.incomplete_line = true;
+        }
+        self.out.write(buf)
     }
 }
 
