@@ -10,3 +10,4 @@ repository = "https://github.com/sourcefrog/nutmeg"
 
 [dependencies]
 crossterm = "0.23"
+yansi = "0.5"

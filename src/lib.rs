@@ -5,9 +5,9 @@
 //!
 //! ## Concept
 //!
-//! By contrast to other Rust progress-bar libraries, Nutmeg has no
-//! built-in concept of what the progress bar or indicator should look like:
-//! this is entirely under the control of the application.
+//! By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
+//! concept of what the progress bar or indicator should look like: this is
+//! entirely under the control of the application.
 //!
 //! The application is responsible for:
 //!
