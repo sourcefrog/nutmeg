@@ -110,7 +110,6 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use terminal_size::{terminal_size, Width};
-use yansi::Paint;
 
 mod ansi;
 
@@ -209,11 +208,10 @@ impl<M: Model> View<M, io::Stdout> {
     ///
     /// `model` is the application-defined initial model.
     pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
-        let out = io::stdout();
-        if atty::isnt(atty::Stream::Stdout) || !Paint::enable_windows_ascii() {
+        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        // TODO: Enable Windows once and remember the result
+        let out = io::stdout();
         let inner_view = InnerView {
             out,
             model,
