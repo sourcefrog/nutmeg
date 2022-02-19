@@ -1,28 +1,24 @@
 // Copyright 2022 Martin Pool.
 
-//! Manage a console/terminal UI that can alternate between showing a progress
-//! bar and lines of text output.
+//! Nutmeg draws terminal progress bars whose appearance is completely controlled
+//! by the application.
 //!
 //! ## Concept
 //!
 //! By contrast to other Rust progress-bar libraries, Nutmeg has no
 //! built-in concept of what the progress bar or indicator should look like:
-//! this is entirely under the control of the application. Nutmeg handles
-//! drawing the application's progress bar to the screen and removing it as needed.
+//! this is entirely under the control of the application.
 //!
-//! The application (or dependent library) is responsible for:
+//! The application is responsible for:
 //!
-//! * Defining a type that implements [Model], which holds whatever information
-//!   is relevant to drawing progress.
-//! * Defining how to render that information into some text lines, by
-//!   implementing [Model::render]. This returns a `String` for the progress
-//!   representation, optionally including ANSI styling.
-//! * Constructing a [View] that will draw progress to the terminal.
-//! * Notifying the [View] when there are model updates, by calling
-//!   [View::update].
-//! * While a [View] is in use, all text written to stdout/stderr should be sent
-//!   via that view, to avoid the display getting scrambled. That is to say,
-//!   use `writeln!(view, "hello")` rather than `println!("hello")`.
+//! 1. Defining a type holds whatever information
+//!    is relevant to drawing progress bars.
+//! 2. Rendering that information into styled text lines, by
+//!    implementing the single-method trait [Model::render].
+//! 3. Constructing a [View] to draw a progress bar.
+//! 4. Updating the model when appropriate by calling [View::update].
+//! 5. Printing text output via the [View] while it is in use,
+//!    to avoid the display getting scrambled.
 //!
 //! The Nutmeg library is responsible for:
 //!
@@ -37,6 +33,51 @@
 //!
 //! Errors in writing to the terminal cause a panic.
 //!
+//! ## Example
+//!
+//! ```
+//! use std::io::Write;
+//!
+//! // 1. Define a struct holding all the application state necessary to
+//! // render the progress bar.
+//! #[derive(Default)]
+//! struct Model {
+//!     i: usize,
+//!     total: usize,
+//!     last_file_name: String,
+//! }
+//!
+//! // 2. Define how to render the progress bar as a String.
+//! impl nutmeg::Model for Model {
+//!     fn render(&mut self, _width: usize) -> String {
+//!         format!("{}/{}: {}", self.i, self.total, self.last_file_name)
+//!     }
+//! }
+//!
+//! fn main() -> std::io::Result<()> {
+//!     // 3. Create a View when you want to draw a progress bar.
+//!     let mut view = nutmeg::View::new(Model::default(),
+//!         nutmeg::ViewOptions::default());
+//!
+//!     // 4. As the application runs, update the model via the view.
+//!     for i in 0..100 {
+//!         view.update(|model| {
+//!             model.i += 1;
+//!             model.last_file_name = format!("file{}.txt", i);
+//!         });
+//!         // 5. Interleave text output lines by writing to the view.
+//!         if i % 10 == 3 {
+//!             writeln!(view, "reached {}", i)?;
+//!         }
+//!     }
+//!
+//!     // 5. The bar is automatically erased when dropped.
+//!     Ok(())
+//! }
+//! ```
+//!
+//! See the `examples/` directory for more.
+//!
 //! ## Potential future features
 //!
 //! * Draw updates from a background thread, so that it will keep ticking even
@@ -44,7 +85,8 @@
 //!   burst of updates followed by a long pause. The background thread will
 //!   eventually paint the last drawn update.
 //!
-//! * Write to an arbitrary `Write`, not just stdout?
+//! * Write to an arbitrary `Write`, not just stdout? In particular, some
+//!   applications might prefer progress on stderr.
 //!
 //! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
@@ -56,8 +98,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use crossterm::terminal::ClearType;
-use crossterm::{cursor, queue, style, terminal};
 use crossterm::tty::IsTty;
+use crossterm::{cursor, queue, style, terminal};
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -105,11 +147,6 @@ where
     M: Model,
     Out: Write,
 {
-    /// Erase the progress bar from the screen and conclude.
-    pub fn finish(self) {
-        self.hide();
-    }
-
     /// Stop updating, without necessarily removing any currently visible
     /// progress.
     pub fn abandon(self) {
@@ -120,7 +157,10 @@ where
     }
 
     /// Update the model, and queue a redraw of the screen for later.
-    pub fn update(&self, update_fn: fn(&mut M) -> ()) {
+    pub fn update<U>(&self, update_fn: U)
+    where
+        U: FnOnce(&mut M),
+    {
         self.inner
             .lock()
             .unwrap()
@@ -260,7 +300,10 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         Ok(())
     }
 
-    fn update(&mut self, update_fn: fn(&mut M) -> ()) -> io::Result<()> {
+    fn update<U>(&mut self, update_fn: U) -> io::Result<()>
+    where
+        U: FnOnce(&mut M),
+    {
         update_fn(&mut self.model);
         self.paint_progress()
     }
@@ -269,8 +312,8 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 /// Options controlling a View.
 ///
 /// These are supplied to [View::new] and cannot be changed after the view is created.
-/// 
-/// The default options created by [ViewOptions::default] should be reasonable 
+///
+/// The default options created by [ViewOptions::default] should be reasonable
 /// for most applications.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -282,14 +325,14 @@ pub struct ViewOptions {
     pub print_holdoff: Duration,
 
     /// Is the progress bar drawn at all?
-    /// 
+    ///
     /// This value will be ignored by [View::new] if stdout is not a terminal.
     pub progress_enabled: bool,
 }
 
 impl Default for ViewOptions {
     /// Create default reasonable view options.
-    /// 
+    ///
     /// The update interval and print holdoff are 250ms, and the progress bar is enabled.
     fn default() -> ViewOptions {
         ViewOptions {
