@@ -29,7 +29,7 @@ fn main() {
                 Paint::new(format!(
                     "{} {}",
                     Paint::new("item").italic(),
-                    Paint::new(i).blink()
+                    Paint::new(i).underline()
                 ))
                 .wrap()
                 .fg(Color::White)
