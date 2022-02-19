@@ -136,8 +136,19 @@ pub trait Model {
 /// The View may be shared freely across threads: it internally
 /// synchronizes updates.
 ///
+/// # Printing text lines
+/// 
 /// The View implements [std::io::Write] and so can be used by e.g.
 /// [std::writeln] to print non-progress output lines.
+/// 
+/// The progress bar is removed from the screen to make room
+/// for the printed output.
+/// 
+/// Printed output is emitted even if the progress bar is not enabled.
+/// 
+/// It is OK to print incomplete lines, i.e. without a final `\n` 
+/// character. In this case the progress bar remains suspended
+/// until the line is completed.
 pub struct View<M: Model, Out: Write> {
     inner: Mutex<InnerView<M, Out>>,
 }
@@ -251,7 +262,7 @@ struct InnerView<M: Model, Out: Write> {
 
 impl<M: Model, Out: Write> InnerView<M, Out> {
     fn paint_progress(&mut self) -> io::Result<()> {
-        if !self.options.progress_enabled {
+        if !self.options.progress_enabled || self.incomplete_line {
             return Ok(());
         }
         // TODO: Move up over any existing progress bar.
@@ -305,11 +316,18 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     }
 
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if let Some(last) = buf.last() {
+            self.incomplete_line = *last != b'\n';
+        } else {
+            return Ok(0);
+        }
         self.hide()?;
         if !buf.ends_with(b"\n") {
             self.incomplete_line = true;
         }
-        self.out.write(buf)
+        self.out.write_all(buf)?;
+        self.out.flush()?;
+        Ok(buf.len())
     }
 }
 
