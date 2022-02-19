@@ -9,16 +9,24 @@
 //! concept of what the progress bar or indicator should look like: this is
 //! entirely under the control of the application.
 //!
+//! Nutmeg only supports ANSI terminals, which are supported on all Unix
+//! and Windows 10 and later.
+//!
 //! The application is responsible for:
 //!
-//! 1. Defining a type holds whatever information
-//!    is relevant to drawing progress bars.
-//! 2. Rendering that information into styled text lines, by
-//!    implementing the single-method trait [Model::render].
+//! 1. Defining a type holds whatever information is relevant to drawing
+//!    progress bars.
+//! 2. Rendering that information into styled text lines, by implementing the
+//!    single-method trait [Model::render].
+//!    * The application can control colors and styling by including ANSI
+//!      escape sequences in the rendered string, for example by using the
+//!      `yansi` crate.
+//!    * The application is responsible for deciding whether or not to   
+//!      color its output, for example by consulting `$CLICOLORS`.
 //! 3. Constructing a [View] to draw a progress bar.
 //! 4. Updating the model when appropriate by calling [View::update].
-//! 5. Printing text output via the [View] while it is in use,
-//!    to avoid the display getting scrambled.
+//! 5. Printing text output via the [View] while it is in use, to avoid the
+//!    display getting scrambled.
 //!
 //! The Nutmeg library is responsible for:
 //!
@@ -90,6 +98,10 @@
 //!
 //! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
+//!
+//! * Better detection of when to draw colors, or not. Possibly look at
+//!   `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
+//!   <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
 
 #![warn(missing_docs)]
 
@@ -97,9 +109,10 @@ use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use crossterm::terminal::ClearType;
-use crossterm::tty::IsTty;
-use crossterm::{cursor, queue, style, terminal};
+use terminal_size::{terminal_size, Width};
+use yansi::Paint;
+
+mod ansi;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -137,16 +150,16 @@ pub trait Model {
 /// synchronizes updates.
 ///
 /// # Printing text lines
-/// 
+///
 /// The View implements [std::io::Write] and so can be used by e.g.
 /// [std::writeln] to print non-progress output lines.
-/// 
+///
 /// The progress bar is removed from the screen to make room
 /// for the printed output.
-/// 
+///
 /// Printed output is emitted even if the progress bar is not enabled.
-/// 
-/// It is OK to print incomplete lines, i.e. without a final `\n` 
+///
+/// It is OK to print incomplete lines, i.e. without a final `\n`
 /// character. In this case the progress bar remains suspended
 /// until the line is completed.
 pub struct View<M: Model, Out: Write> {
@@ -197,9 +210,10 @@ impl<M: Model> View<M, io::Stdout> {
     /// `model` is the application-defined initial model.
     pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
         let out = io::stdout();
-        if !out.is_tty() {
+        if atty::isnt(atty::Stream::Stdout) || !Paint::enable_windows_ascii() {
             options.progress_enabled = false;
         }
+        // TODO: Enable Windows once and remember the result
         let inner_view = InnerView {
             out,
             model,
@@ -267,27 +281,29 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         }
         // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
-        let width = terminal::size()?.0 as usize;
+        if let Some((Width(width), _)) = terminal_size() {
+            let width = width as usize;
 
-        let rendered = self.model.render(width);
-        // Remove exactly one trailing newline, if there is one.
-        let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
-        assert!(
-            !rendered.contains('\n'),
-            "multi-line progress is not implemented yet"
-        );
+            let rendered = self.model.render(width);
+            // Remove exactly one trailing newline, if there is one.
+            let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+            assert!(
+                !rendered.contains('\n'),
+                "multi-line progress is not implemented yet"
+            );
+            write!(
+                self.out,
+                "{}{}{}{}",
+                ansi::MOVE_TO_START_OF_LINE,
+                ansi::DISABLE_LINE_WRAP,
+                rendered,
+                ansi::CLEAR_TO_END_OF_LINE
+            )?;
+            self.out.flush()?;
 
-        queue!(
-            self.out,
-            cursor::MoveToColumn(1),
-            terminal::DisableLineWrap,
-            style::Print(rendered),
-            terminal::Clear(ClearType::UntilNewLine)
-        )?;
-        self.out.flush()?;
-
-        self.progress_drawn = true;
-        // TODO: Count lines; write one line at a time and erase to EOL; finally erase downwards.
+            self.progress_drawn = true;
+            // TODO: Count lines; write one line at a time and erase to EOL; finally erase downwards.
+        }
         Ok(())
     }
 
@@ -296,12 +312,14 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     fn hide(&mut self) -> io::Result<()> {
         if self.progress_drawn {
             // todo!("move up the right number of lines then clear downwards, then update model");
-            queue!(
+            write!(
                 self.out,
-                terminal::Clear(terminal::ClearType::CurrentLine),
-                cursor::MoveToColumn(1),
-                terminal::EnableLineWrap
-            )?;
+                "{}{}{}",
+                ansi::CLEAR_CURRENT_LINE,
+                ansi::MOVE_TO_START_OF_LINE,
+                ansi::ENABLE_LINE_WRAP,
+            )
+            .unwrap();
             self.progress_drawn = false;
         }
         Ok(())
