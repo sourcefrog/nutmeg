@@ -112,6 +112,7 @@ use std::time::Duration;
 use terminal_size::{terminal_size, Width};
 
 mod ansi;
+mod windows;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
