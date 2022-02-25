@@ -105,6 +105,7 @@
 
 #![warn(missing_docs)]
 
+use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -139,6 +140,25 @@ pub trait Model {
     /// }
     /// ```
     fn render(&mut self, width: usize) -> String;
+}
+
+/// Blanket implementation of Model for Display.
+/// 
+/// `self` is converted to a display string without regard for
+/// the terminal width.
+/// 
+/// This allows direct use of e.g. a String, PathBuf, or integer as a model
+/// for very basic progress indications.
+/// 
+/// ```
+/// let view = nutmeg::View::stdout(0, 
+///     nutmeg::ViewOptions::default());
+/// view.update(|model| *model += 1);
+/// ```
+impl<T> Model for T where T: Display {
+    fn render(&mut self, _width: usize) -> String {
+        self.to_string()
+    }
 }
 
 /// A view that draws and coordinates a progress bar on the terminal.
