@@ -355,19 +355,37 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 ///
 /// The default options created by [ViewOptions::default] should be reasonable
 /// for most applications.
+/// 
+/// # Example
+/// ```
+/// let options = nutmeg::ViewOptions::default()
+///     .progress_enabled(false); // Don't draw bars, only print.
+/// ```
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ViewOptions {
     /// Target interval to repaint the progress bar.
-    pub update_interval: Duration,
+    update_interval: Duration,
 
     /// How long to wait after printing output before drawing the progress bar again.
-    pub print_holdoff: Duration,
+    print_holdoff: Duration,
 
     /// Is the progress bar drawn at all?
     ///
     /// This value will be ignored by [View::new] if stdout is not a terminal.
-    pub progress_enabled: bool,
+    progress_enabled: bool,
+}
+
+impl ViewOptions {
+    /// Set whether the progress bar will be drawn.
+    /// 
+    /// By default it is drawn.
+    pub fn progress_enabled(self, progress_enabled: bool) -> ViewOptions {
+        ViewOptions {
+            progress_enabled,
+            ..self
+        }
+    }
 }
 
 impl Default for ViewOptions {

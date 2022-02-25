@@ -15,8 +15,8 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let mut options = nutmeg::ViewOptions::default();
-    options.progress_enabled = false;
+    let options = nutmeg::ViewOptions::default()
+        .progress_enabled(false);
     let view = nutmeg::View::new(Model { i: 0 }, options);
     for _i in 1..=5 {
         view.update(|state| state.i += 1);
