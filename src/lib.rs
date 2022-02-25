@@ -64,7 +64,7 @@
 //!
 //! fn main() -> std::io::Result<()> {
 //!     // 3. Create a View when you want to draw a progress bar.
-//!     let mut view = nutmeg::View::new(Model::default(),
+//!     let mut view = nutmeg::View::stdout(Model::default(),
 //!         nutmeg::ViewOptions::default());
 //!
 //!     // 4. As the application runs, update the model via the view.
@@ -99,7 +99,7 @@
 //! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
 //!
-//! * Better detection of when to draw colors, or not. Possibly look at
+//! * Better detection of when to draw progress or not. Possibly look at
 //!   `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
 //!   <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
 
@@ -209,7 +209,7 @@ impl<M: Model> View<M, io::Stdout> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model.
-    pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
+    pub fn stdout(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }

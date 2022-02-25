@@ -23,7 +23,7 @@ fn zz() {
 fn main() -> io::Result<()> {
     let options = nutmeg::ViewOptions::default();
     let model = Model { i: 0, legal: true };
-    let mut view = nutmeg::View::new(model, options);
+    let mut view = nutmeg::View::stdout(model, options);
     for i in 1..=5 {
         view.update(|model| model.i += 1);
         zz();
