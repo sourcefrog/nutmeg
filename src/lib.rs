@@ -213,12 +213,11 @@ impl<M: Model> View<M, io::Stdout> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        let out = io::stdout();
         let inner_view = InnerView {
-            out,
+            out: io::stdout(),
             model,
             progress_drawn: false,
-            // cursor_y: 0,
+            cursor_y: 0,
             incomplete_line: false,
             options,
         };
@@ -260,13 +259,12 @@ struct InnerView<M: Model, Out: Write> {
     out: Out,
 
     /// True if the progress output is currently drawn to the screen.
-    // TODO: Maybe make this an actual state machine where drawing depends
-    // on the state enum?
     progress_drawn: bool,
 
-    // /// Number of lines the cursor is below the line where the progress bar
-    // /// should next be drawn.
-    // cursor_y: usize,
+    /// Number of lines the cursor is below the line where the progress bar
+    /// should next be drawn.
+    cursor_y: usize,
+
     /// True if there's an incomplete line of output printed, and the
     /// progress bar can't be drawn until it's completed.
     incomplete_line: bool,
@@ -279,7 +277,6 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         if !self.options.progress_enabled || self.incomplete_line {
             return Ok(());
         }
-        // TODO: Move up over any existing progress bar.
         // TODO: Throttle, and keep track of the last update.
         if let Some((Width(width), _)) = terminal_size() {
             let width = width as usize;
@@ -287,22 +284,19 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             let rendered = self.model.render(width);
             // Remove exactly one trailing newline, if there is one.
             let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
-            assert!(
-                !rendered.contains('\n'),
-                "multi-line progress is not implemented yet"
-            );
+            let newlines = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
             write!(
                 self.out,
                 "{}{}{}{}",
-                ansi::MOVE_TO_START_OF_LINE,
+                ansi::up_n_lines_and_home(self.cursor_y),
                 ansi::DISABLE_LINE_WRAP,
+                ansi::CLEAR_TO_END_OF_LINE,
                 rendered,
-                ansi::CLEAR_TO_END_OF_LINE
             )?;
             self.out.flush()?;
 
             self.progress_drawn = true;
-            // TODO: Count lines; write one line at a time and erase to EOL; finally erase downwards.
+            self.cursor_y = newlines;
         }
         Ok(())
     }
@@ -315,12 +309,13 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             write!(
                 self.out,
                 "{}{}{}",
-                ansi::CLEAR_CURRENT_LINE,
-                ansi::MOVE_TO_START_OF_LINE,
+                ansi::up_n_lines_and_home(self.cursor_y),
+                ansi::CLEAR_TO_END_OF_SCREEN,
                 ansi::ENABLE_LINE_WRAP,
             )
             .unwrap();
             self.progress_drawn = false;
+            self.cursor_y = 0;
         }
         Ok(())
     }
@@ -355,7 +350,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 ///
 /// The default options created by [ViewOptions::default] should be reasonable
 /// for most applications.
-/// 
+///
 /// # Example
 /// ```
 /// let options = nutmeg::ViewOptions::default()
@@ -378,7 +373,7 @@ pub struct ViewOptions {
 
 impl ViewOptions {
     /// Set whether the progress bar will be drawn.
-    /// 
+    ///
     /// By default it is drawn.
     pub fn progress_enabled(self, progress_enabled: bool) -> ViewOptions {
         ViewOptions {
