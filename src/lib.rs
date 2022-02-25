@@ -147,7 +147,7 @@ pub trait Model {
 /// `self` is converted to a display string without regard for
 /// the terminal width.
 /// 
-/// This allows direct use of e.g. a String, PathBuf, or integer as a model
+/// This allows direct use of e.g. a String or integer as a model
 /// for very basic progress indications.
 /// 
 /// ```
