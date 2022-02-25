@@ -14,7 +14,7 @@ pub(crate) const CLEAR_CURRENT_LINE: &str = "\x1b[2K";
 
 #[cfg(windows)]
 pub(crate) fn enable_windows_ansi() -> bool {
-    windows::enable_windows_ansi()
+    crate::windows::enable_windows_ansi()
 }
 
 #[cfg(not(windows))]
