@@ -7,6 +7,8 @@
 
 #![allow(unused)]
 
+use std::borrow::Cow;
+
 pub(crate) const MOVE_TO_START_OF_LINE: &str = "\x1b[1G";
 
 // https://vt100.net/docs/vt510-rm/DECAWM
@@ -17,9 +19,9 @@ pub(crate) const CLEAR_TO_END_OF_LINE: &str = "\x1b[0K";
 pub(crate) const CLEAR_CURRENT_LINE: &str = "\x1b[2K";
 pub(crate) const CLEAR_TO_END_OF_SCREEN: &str = "\x1b[0J";
 
-pub(crate) fn up_n_lines_and_home(n: usize) -> String {
+pub(crate) fn up_n_lines_and_home(n: usize) -> Cow<'static, str> {
     if n > 0 {
-        format!("\x1b[{}F", n)
+        format!("\x1b[{}F", n).into()
     } else {
         MOVE_TO_START_OF_LINE.into()
     }
