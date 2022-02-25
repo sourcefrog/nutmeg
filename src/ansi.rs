@@ -18,7 +18,11 @@ pub(crate) const CLEAR_CURRENT_LINE: &str = "\x1b[2K";
 pub(crate) const CLEAR_TO_END_OF_SCREEN: &str = "\x1b[0J";
 
 pub(crate) fn up_n_lines_and_home(n: usize) -> String {
-    format!("\x1b[{}F", n)
+    if n > 0 {
+        format!("\x1b[{}F", n)
+    } else {
+        MOVE_TO_START_OF_LINE.into()
+    }
 }
 
 #[cfg(windows)]
