@@ -107,7 +107,7 @@ use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use terminal_size::{Width};
+use terminal_size::Width;
 
 mod ansi;
 #[cfg(windows)]
@@ -269,15 +269,13 @@ impl<M: Model, W: Write> View<M, W> {
     /// This is probably mostly useful for testing: most applications
     /// will want [View::new].
     ///
-    /// This function  assumes the stream is a tty and capable of drawing
-    /// progress bars through ANSI sequences.
+    /// This function assumes the stream is a tty and capable of drawing
+    /// progress bars through ANSI sequences, and does not try to
+    /// detect whether this is true, as [View::new] does.
     ///
     /// Views constructed by this model use a fixed terminal width, rather
     /// than trying to dynamically measure the terminal width.
-    pub fn write_to(model: M, mut options: ViewOptions, out: W, width: usize) -> View<M, W> {
-        if !ansi::enable_windows_ansi() {
-            options.progress_enabled = false;
-        }
+    pub fn write_to(model: M, options: ViewOptions, out: W, width: usize) -> View<M, W> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
@@ -322,32 +320,32 @@ enum WidthStrategy {
 impl WidthStrategy {
     fn width(&self) -> Option<usize> {
         match self {
-         WidthStrategy::Fixed(width) => Some(*width),
-         WidthStrategy::Stdout => WidthStrategy::stdout(),
-         WidthStrategy::Stderr => WidthStrategy::stderr(),
+            WidthStrategy::Fixed(width) => Some(*width),
+            WidthStrategy::Stdout => WidthStrategy::stdout(),
+            WidthStrategy::Stderr => WidthStrategy::stderr(),
         }
     }
-    
+
     #[cfg(unix)]
     fn stdout() -> Option<usize> {
-        terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize) 
+        terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize)
     }
 
     #[cfg(windows)]
     fn stdout() -> Option<usize> {
         // TODO: We could get the handle for stderr to make this more precise...
-        terminal_size::terminal_size().map(|(Width(w), _)| w as usize) 
+        terminal_size::terminal_size().map(|(Width(w), _)| w as usize)
     }
-    
+
     #[cfg(unix)]
     fn stderr() -> Option<usize> {
-        terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize) 
+        terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize)
     }
-    
+
     #[cfg(windows)]
     fn stderr() -> Option<usize> {
         // TODO: We could get the handle for stderr to make this more precise...
-        terminal_size::terminal_size().map(|(Width(w), _)| w as usize) 
+        terminal_size::terminal_size().map(|(Width(w), _)| w as usize)
     }
 }
 
