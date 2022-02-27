@@ -64,7 +64,7 @@
 //!
 //! fn main() -> std::io::Result<()> {
 //!     // 3. Create a View when you want to draw a progress bar.
-//!     let mut view = nutmeg::View::stdout(Model::default(),
+//!     let mut view = nutmeg::View::new(Model::default(),
 //!         nutmeg::ViewOptions::default());
 //!
 //!     // 4. As the application runs, update the model via the view.
@@ -148,8 +148,7 @@ pub trait Model {
 /// for very basic progress indications.
 ///
 /// ```
-/// let view = nutmeg::View::stdout(0,
-///     nutmeg::ViewOptions::default());
+/// let view = nutmeg::View::new(0, nutmeg::ViewOptions::default());
 /// view.update(|model| *model += 1);
 /// ```
 impl<T> Model for T
@@ -229,7 +228,7 @@ impl<M: Model> View<M, io::Stdout> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model.
-    pub fn stdout(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
+    pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
@@ -238,7 +237,26 @@ impl<M: Model> View<M, io::Stdout> {
                 model,
                 io::stdout(),
                 options,
-                WidthStrategy::FromTerminal,
+                WidthStrategy::Stdout,
+            )),
+        }
+    }
+}
+
+impl<M: Model> View<M, io::Stderr> {
+    /// Construct a new progress view, drawn to stderr.
+    ///
+    /// `model` is the application-defined initial model.
+    pub fn to_stderr(model: M, mut options: ViewOptions) -> View<M, io::Stderr> {
+        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
+            options.progress_enabled = false;
+        }
+        View {
+            inner: Mutex::new(InnerView::new(
+                model,
+                io::stderr(),
+                options,
+                WidthStrategy::Stderr,
             )),
         }
     }
@@ -249,7 +267,7 @@ impl<M: Model, W: Write> View<M, W> {
     /// [std::io::Write] stream.
     ///
     /// This is probably mostly useful for testing: most applications
-    /// will want [View::stdout].
+    /// will want [View::new].
     ///
     /// This function  assumes the stream is a tty and capable of drawing
     /// progress bars through ANSI sequences.
@@ -297,7 +315,30 @@ impl<M: Model, Out: Write> Drop for View<M, Out> {
 /// How to determine the terminal width.
 enum WidthStrategy {
     Fixed(usize),
-    FromTerminal,
+    Stdout,
+    Stderr,
+}
+
+impl WidthStrategy {
+    fn width(&self) -> Option<usize> {
+        match self {
+            WidthStrategy::Fixed(width) => Some(*width),
+            WidthStrategy::Stdout => {
+                if let Some((Width(width), _)) = terminal_size() {
+                    Some(width as usize)
+                } else {
+                    None
+                }
+            }
+            WidthStrategy::Stderr => {
+                if let Some((Width(width), _)) = terminal_size::terminal_size_using_fd(2) {
+                    Some(width as usize)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 /// The real contents of a View, inside a mutex.
@@ -347,31 +388,23 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         if !self.options.progress_enabled || self.incomplete_line {
             return Ok(());
         }
-        let width = match self.width_strategy {
-            WidthStrategy::Fixed(width) => width,
-            WidthStrategy::FromTerminal => {
-                if let Some((Width(width), _)) = terminal_size() {
-                    width as usize
-                } else {
-                    return Ok(());
-                }
-            }
-        };
-        // TODO: Throttle, and keep track of the last update.
-        let rendered = self.model.render(width);
-        let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
-        write!(
-            self.out,
-            "{}{}{}{}",
-            ansi::up_n_lines_and_home(self.cursor_y),
-            ansi::DISABLE_LINE_WRAP,
-            ansi::CLEAR_TO_END_OF_LINE,
-            rendered,
-        )?;
-        self.out.flush()?;
+        if let Some(width) = self.width_strategy.width() {
+            // TODO: Throttle, and keep track of the last update.
+            let rendered = self.model.render(width);
+            let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+            write!(
+                self.out,
+                "{}{}{}{}",
+                ansi::up_n_lines_and_home(self.cursor_y),
+                ansi::DISABLE_LINE_WRAP,
+                ansi::CLEAR_TO_END_OF_LINE,
+                rendered,
+            )?;
+            self.out.flush()?;
 
-        self.progress_drawn = true;
-        self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
+            self.progress_drawn = true;
+            self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
+        }
         Ok(())
     }
 
@@ -420,7 +453,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 
 /// Options controlling a View.
 ///
-/// These are supplied to [View::new] and cannot be changed after the view is created.
+/// These are supplied to a constructor like [View::new] and cannot be changed after the view is created.
 ///
 /// The default options created by [ViewOptions::default] should be reasonable
 /// for most applications.

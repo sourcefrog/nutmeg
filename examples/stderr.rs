@@ -1,5 +1,4 @@
-//! The render function is passed the terminal width and can use it to make things
-//! fit nicely.
+//! Draw to stderr. Try this with stdout redirected to a file.
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -27,7 +26,7 @@ fn main() {
         i: 0,
         start_time: Instant::now(),
     };
-    let view = nutmeg::View::new(state, options);
+    let view = nutmeg::View::to_stderr(state, options);
     for _ in 1..=120 {
         view.update(|state| state.i += 1);
         sleep(Duration::from_millis(100));

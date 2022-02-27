@@ -19,7 +19,7 @@ impl nutmeg::Model for Model {
 
 fn main() {
     let options = nutmeg::ViewOptions::default();
-    let mut view = nutmeg::View::stdout(Model { i: 0 }, options);
+    let mut view = nutmeg::View::new(Model { i: 0 }, options);
     for i in 1..=45 {
         view.update(|state| state.i += 1);
         if i % 5 == 0 {

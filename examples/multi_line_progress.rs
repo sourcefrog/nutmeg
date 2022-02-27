@@ -32,7 +32,7 @@ fn main() {
         i: 0,
         start: Instant::now(),
     };
-    let view = nutmeg::View::stdout(model, options);
+    let view = nutmeg::View::new(model, options);
     for _i in 1..=40 {
         view.update(|state| state.i += 1);
         sleep(Duration::from_millis(200));
