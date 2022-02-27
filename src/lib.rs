@@ -199,7 +199,7 @@ where
     pub fn abandon(self) {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
-        self.inner.lock().unwrap().progress_drawn = false;
+        self.inner.lock().unwrap().abandon().unwrap();
         // Nothing to do; consuming it is enough?
     }
 
@@ -418,6 +418,14 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         self.out.write_all(buf)?;
         self.out.flush()?;
         Ok(buf.len())
+    }
+
+    fn abandon(&mut self) -> io::Result<()> {
+        if self.progress_drawn {
+            self.out.write(b"\n")?;
+        }
+        self.progress_drawn = false; // so that drop does not attempt to erase
+        Ok(())
     }
 }
 

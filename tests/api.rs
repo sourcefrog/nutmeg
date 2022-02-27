@@ -31,6 +31,23 @@ fn draw_progress_once() {
 }
 
 #[test]
+fn abandoned_bar_is_not_erased() {
+    let mut out: Vec<u8> = Vec::new();
+    let model = MultiLineModel { i: 0 };
+    let options = nutmeg::ViewOptions::default();
+    let view = nutmeg::View::write_to(model, options, &mut out, 90);
+
+    view.update(|model| model.i = 1);
+    view.abandon();
+
+    // No erasure commands, just a newline after the last painted view.
+    assert_eq!(
+        String::from_utf8(out).unwrap(),
+        "\x1b[1G\x1b[?7l\x1b[0K  count: 1\n    bar: *\n"
+    );
+}
+
+#[test]
 fn disabled_progress_is_not_drawn() {
     let mut out: Vec<u8> = Vec::new();
     let model = MultiLineModel { i: 0 };
