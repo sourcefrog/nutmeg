@@ -10,6 +10,8 @@ repository = "https://github.com/sourcefrog/nutmeg"
 
 [dependencies]
 atty = "0.2"
-# crossterm = "0.23"
 terminal_size = "0.1"
 yansi = "0.5"
+
+[dev-dependencies]
+pretty_assertions = "1.1"

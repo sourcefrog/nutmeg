@@ -215,13 +215,23 @@ where
             .expect("progress update failed")
     }
 
-    /// Hide the progress bar if it's currently drawn.
-    pub fn hide(&self) {
+    /// Hide the progress bar if it's currently drawn, and leave it 
+    /// hidden until [View::resume] is called.
+    pub fn suspend(&self) {
         self.inner
             .lock()
             .unwrap()
-            .hide()
-            .expect("failed to hide progress bar")
+            .suspend()
+            .unwrap()
+    }
+
+    /// Allow the progress bar to be drawn again. 
+    pub fn resume(&self) {
+        self.inner
+            .lock()
+            .unwrap()
+            .resume()
+            .unwrap()
     }
 }
 
@@ -322,6 +332,9 @@ struct InnerView<M: Model, Out: Write> {
     /// True if the progress output is currently drawn to the screen.
     progress_drawn: bool,
 
+    /// True if the progress bar is suspended, and should not be drawn.
+    suspended: bool,
+
     /// Number of lines the cursor is below the line where the progress bar
     /// should next be drawn.
     cursor_y: usize,
@@ -351,11 +364,12 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             progress_drawn: false,
             cursor_y: 0,
             incomplete_line: false,
+            suspended: false,
         }
     }
 
     fn paint_progress(&mut self) -> io::Result<()> {
-        if !self.options.progress_enabled || self.incomplete_line {
+        if !self.options.progress_enabled || self.incomplete_line || self.suspended {
             return Ok(());
         }
         if let Some(width) = self.width_strategy.width() {
@@ -376,6 +390,17 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
         }
         Ok(())
+    }
+
+    /// Hide the progress bar and leave it hidden until it is resumed.
+    fn suspend(&mut self) -> io::Result<()> {
+        self.suspended = true;
+        self.hide()
+    }
+
+    fn resume(&mut self) -> io::Result<()> {
+        self.suspended = false;
+        self.paint_progress()
     }
 
     /// Clear the progress bars off the screen, leaving it ready to
