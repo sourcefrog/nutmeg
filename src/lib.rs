@@ -107,11 +107,12 @@ use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use terminal_size::Width;
-
 mod ansi;
+mod width;
 #[cfg(windows)]
 mod windows;
+
+use crate::width::WidthStrategy;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -307,45 +308,6 @@ impl<M: Model, Out: Write> Drop for View<M, Out> {
         if let Ok(mut inner) = self.inner.try_lock() {
             let _ = inner.hide();
         }
-    }
-}
-
-/// How to determine the terminal width.
-enum WidthStrategy {
-    Fixed(usize),
-    Stdout,
-    Stderr,
-}
-
-impl WidthStrategy {
-    fn width(&self) -> Option<usize> {
-        match self {
-            WidthStrategy::Fixed(width) => Some(*width),
-            WidthStrategy::Stdout => WidthStrategy::stdout(),
-            WidthStrategy::Stderr => WidthStrategy::stderr(),
-        }
-    }
-
-    #[cfg(unix)]
-    fn stdout() -> Option<usize> {
-        terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize)
-    }
-
-    #[cfg(windows)]
-    fn stdout() -> Option<usize> {
-        // TODO: We could get the handle for stderr to make this more precise...
-        terminal_size::terminal_size().map(|(Width(w), _)| w as usize)
-    }
-
-    #[cfg(unix)]
-    fn stderr() -> Option<usize> {
-        terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize)
-    }
-
-    #[cfg(windows)]
-    fn stderr() -> Option<usize> {
-        // TODO: We could get the handle for stderr to make this more precise...
-        terminal_size::terminal_size().map(|(Width(w), _)| w as usize)
     }
 }
 
