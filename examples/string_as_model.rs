@@ -1,9 +1,9 @@
 //! Use a simple String as a Model, with no need to `impl Model`.
 
 use std::fs::read_dir;
+use std::io;
 use std::thread::sleep;
 use std::time::Duration;
-use std::io;
 
 fn main() -> io::Result<()> {
     let options = nutmeg::ViewOptions::default();

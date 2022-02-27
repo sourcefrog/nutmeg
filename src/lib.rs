@@ -143,19 +143,22 @@ pub trait Model {
 }
 
 /// Blanket implementation of Model for Display.
-/// 
+///
 /// `self` is converted to a display string without regard for
 /// the terminal width.
-/// 
+///
 /// This allows direct use of e.g. a String or integer as a model
 /// for very basic progress indications.
-/// 
+///
 /// ```
-/// let view = nutmeg::View::stdout(0, 
+/// let view = nutmeg::View::stdout(0,
 ///     nutmeg::ViewOptions::default());
 /// view.update(|model| *model += 1);
 /// ```
-impl<T> Model for T where T: Display {
+impl<T> Model for T
+where
+    T: Display,
+{
     fn render(&mut self, _width: usize) -> String {
         self.to_string()
     }
@@ -240,6 +243,38 @@ impl<M: Model> View<M, io::Stdout> {
             cursor_y: 0,
             incomplete_line: false,
             options,
+            width_strategy: WidthStrategy::FromTerminal,
+        };
+        View {
+            inner: Mutex::new(inner_view),
+        }
+    }
+}
+
+impl<M: Model, W: Write> View<M, W> {
+    /// Construct a new progress view writing to an arbitrary
+    /// [std::io::Write] stream.
+    ///
+    /// This is probably mostly useful for testing: most applications
+    /// will want [View::stdout].
+    ///
+    /// This function  assumes the stream is a tty and capable of drawing
+    /// progress bars through ANSI sequences.
+    ///
+    /// Views constructed by this model use a fixed terminal width, rather
+    /// than trying to dynamically measure the terminal width.
+    pub fn write_to(model: M, mut options: ViewOptions, out: W, width: usize) -> View<M, W> {
+        if !ansi::enable_windows_ansi() {
+            options.progress_enabled = false;
+        }
+        let inner_view = InnerView {
+            out,
+            model,
+            progress_drawn: false,
+            cursor_y: 0,
+            incomplete_line: false,
+            options,
+            width_strategy: WidthStrategy::Fixed(width),
         };
         View {
             inner: Mutex::new(inner_view),
@@ -270,6 +305,12 @@ impl<M: Model, Out: Write> Drop for View<M, Out> {
     }
 }
 
+/// How to determine the terminal width.
+enum WidthStrategy {
+    Fixed(usize),
+    FromTerminal,
+}
+
 /// The real contents of a View, inside a mutex.
 struct InnerView<M: Model, Out: Write> {
     /// Current application model.
@@ -290,6 +331,9 @@ struct InnerView<M: Model, Out: Write> {
     incomplete_line: bool,
 
     options: ViewOptions,
+
+    /// How to determine the terminal width before output is rendered.
+    width_strategy: WidthStrategy,
 }
 
 impl<M: Model, Out: Write> InnerView<M, Out> {
@@ -297,27 +341,31 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         if !self.options.progress_enabled || self.incomplete_line {
             return Ok(());
         }
+        let width = match self.width_strategy {
+            WidthStrategy::Fixed(width) => width,
+            WidthStrategy::FromTerminal => {
+                if let Some((Width(width), _)) = terminal_size() {
+                    width as usize
+                } else {
+                    return Ok(());
+                }
+            }
+        };
         // TODO: Throttle, and keep track of the last update.
-        if let Some((Width(width), _)) = terminal_size() {
-            let width = width as usize;
+        let rendered = self.model.render(width);
+        let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+        write!(
+            self.out,
+            "{}{}{}{}",
+            ansi::up_n_lines_and_home(self.cursor_y),
+            ansi::DISABLE_LINE_WRAP,
+            ansi::CLEAR_TO_END_OF_LINE,
+            rendered,
+        )?;
+        self.out.flush()?;
 
-            let rendered = self.model.render(width);
-            // Remove exactly one trailing newline, if there is one.
-            let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
-            let newlines = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
-            write!(
-                self.out,
-                "{}{}{}{}",
-                ansi::up_n_lines_and_home(self.cursor_y),
-                ansi::DISABLE_LINE_WRAP,
-                ansi::CLEAR_TO_END_OF_LINE,
-                rendered,
-            )?;
-            self.out.flush()?;
-
-            self.progress_drawn = true;
-            self.cursor_y = newlines;
-        }
+        self.progress_drawn = true;
+        self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
         Ok(())
     }
 
