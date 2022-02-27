@@ -93,9 +93,6 @@
 //!   burst of updates followed by a long pause. The background thread will
 //!   eventually paint the last drawn update.
 //!
-//! * Write to an arbitrary `Write`, not just stdout? In particular, some
-//!   applications might prefer progress on stderr.
-//!
 //! * Also set the window title from the progress model, perhaps by a different
 //!   render function?
 //!
@@ -236,17 +233,13 @@ impl<M: Model> View<M, io::Stdout> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        let inner_view = InnerView {
-            out: io::stdout(),
-            model,
-            progress_drawn: false,
-            cursor_y: 0,
-            incomplete_line: false,
-            options,
-            width_strategy: WidthStrategy::FromTerminal,
-        };
         View {
-            inner: Mutex::new(inner_view),
+            inner: Mutex::new(InnerView::new(
+                model,
+                io::stdout(),
+                options,
+                WidthStrategy::FromTerminal,
+            )),
         }
     }
 }
@@ -267,17 +260,13 @@ impl<M: Model, W: Write> View<M, W> {
         if !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        let inner_view = InnerView {
-            out,
-            model,
-            progress_drawn: false,
-            cursor_y: 0,
-            incomplete_line: false,
-            options,
-            width_strategy: WidthStrategy::Fixed(width),
-        };
         View {
-            inner: Mutex::new(inner_view),
+            inner: Mutex::new(InnerView::new(
+                model,
+                out,
+                options,
+                WidthStrategy::Fixed(width),
+            )),
         }
     }
 }
@@ -337,6 +326,23 @@ struct InnerView<M: Model, Out: Write> {
 }
 
 impl<M: Model, Out: Write> InnerView<M, Out> {
+    fn new(
+        model: M,
+        out: Out,
+        options: ViewOptions,
+        width_strategy: WidthStrategy,
+    ) -> InnerView<M, Out> {
+        InnerView {
+            out,
+            model,
+            options,
+            width_strategy,
+            progress_drawn: false,
+            cursor_y: 0,
+            incomplete_line: false,
+        }
+    }
+
     fn paint_progress(&mut self) -> io::Result<()> {
         if !self.options.progress_enabled || self.incomplete_line {
             return Ok(());
