@@ -107,7 +107,7 @@ use std::io::{self, Write};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use terminal_size::{terminal_size, Width};
+use terminal_size::{Width};
 
 mod ansi;
 #[cfg(windows)]
@@ -322,22 +322,32 @@ enum WidthStrategy {
 impl WidthStrategy {
     fn width(&self) -> Option<usize> {
         match self {
-            WidthStrategy::Fixed(width) => Some(*width),
-            WidthStrategy::Stdout => {
-                if let Some((Width(width), _)) = terminal_size() {
-                    Some(width as usize)
-                } else {
-                    None
-                }
-            }
-            WidthStrategy::Stderr => {
-                if let Some((Width(width), _)) = terminal_size::terminal_size_using_fd(2) {
-                    Some(width as usize)
-                } else {
-                    None
-                }
-            }
+         WidthStrategy::Fixed(width) => Some(*width),
+         WidthStrategy::Stdout => WidthStrategy::stdout(),
+         WidthStrategy::Stderr => WidthStrategy::stderr(),
         }
+    }
+    
+    #[cfg(unix)]
+    fn stdout() -> Option<usize> {
+        terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize) 
+    }
+
+    #[cfg(windows)]
+    fn stdout() -> Option<usize> {
+        // TODO: We could get the handle for stderr to make this more precise...
+        terminal_size::terminal_size().map(|(Width(w), _)| w as usize) 
+    }
+    
+    #[cfg(unix)]
+    fn stderr() -> Option<usize> {
+        terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize) 
+    }
+    
+    #[cfg(windows)]
+    fn stderr() -> Option<usize> {
+        // TODO: We could get the handle for stderr to make this more precise...
+        terminal_size::terminal_size().map(|(Width(w), _)| w as usize) 
     }
 }
 
