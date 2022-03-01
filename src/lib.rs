@@ -3,7 +3,7 @@
 //! Nutmeg draws terminal progress bars whose appearance is completely controlled
 //! by the application.
 //!
-//! ## Concept
+//! # Concept
 //!
 //! By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
 //! concept of what the progress bar or indicator should look like: this is
@@ -41,7 +41,7 @@
 //!
 //! Errors in writing to the terminal cause a panic.
 //!
-//! ## Example
+//! # Example
 //!
 //! ```
 //! use std::io::Write;
@@ -86,7 +86,7 @@
 //!
 //! See the `examples/` directory for more.
 //!
-//! ## Potential future features
+//! # Potential future features
 //!
 //! * Draw updates from a background thread, so that it will keep ticking even
 //!   if not actively updated, and to better handle applications that send a
@@ -99,6 +99,12 @@
 //! * Better detection of when to draw progress or not. Possibly look at
 //!   `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
 //!   <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
+//! 
+//! # Changelog
+//! 
+//! ## 0.0.0 
+//! 
+//! * First release.
 
 #![warn(missing_docs)]
 
