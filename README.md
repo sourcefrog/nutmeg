@@ -59,3 +59,5 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 ```
+
+[![asciicast](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw.svg)](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw)
