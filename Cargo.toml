@@ -2,7 +2,7 @@
 name = "nutmeg"
 version = "0.0.1-pre"
 edition = "2021"
-description = "Draw flexible progress bars and console output"
+description = "An unopinionated progress bar library"
 license = "MIT"
 repository = "https://github.com/sourcefrog/nutmeg"
 
