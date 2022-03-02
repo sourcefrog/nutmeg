@@ -28,5 +28,4 @@ fn main() {
         }
         thread::sleep(time::Duration::from_millis(300));
     }
-    // Should show nothing because progress is disabled
 }
