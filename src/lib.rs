@@ -99,11 +99,11 @@
 //! * Better detection of when to draw progress or not. Possibly look at
 //!   `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
 //!   <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
-//! 
+//!
 //! # Changelog
-//! 
-//! ## 0.0.0 
-//! 
+//!
+//! ## 0.0.0
+//!
 //! * First release.
 
 #![warn(missing_docs)]
@@ -221,23 +221,15 @@ where
             .expect("progress update failed")
     }
 
-    /// Hide the progress bar if it's currently drawn, and leave it 
+    /// Hide the progress bar if it's currently drawn, and leave it
     /// hidden until [View::resume] is called.
     pub fn suspend(&self) {
-        self.inner
-            .lock()
-            .unwrap()
-            .suspend()
-            .unwrap()
+        self.inner.lock().unwrap().suspend().unwrap()
     }
 
-    /// Allow the progress bar to be drawn again. 
+    /// Allow the progress bar to be drawn again.
     pub fn resume(&self) {
-        self.inner
-            .lock()
-            .unwrap()
-            .resume()
-            .unwrap()
+        self.inner.lock().unwrap().resume().unwrap()
     }
 }
 
@@ -482,15 +474,13 @@ pub struct ViewOptions {
     print_holdoff: Duration,
 
     /// Is the progress bar drawn at all?
-    ///
-    /// This value will be ignored by [View::new] if stdout is not a terminal.
     progress_enabled: bool,
 }
 
 impl ViewOptions {
     /// Set whether the progress bar will be drawn.
     ///
-    /// By default it is drawn.
+    /// By default it is drawn, except that this value will be ignored by [View::new] if stdout is not a terminal.
     pub fn progress_enabled(self, progress_enabled: bool) -> ViewOptions {
         ViewOptions {
             progress_enabled,

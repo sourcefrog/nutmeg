@@ -54,8 +54,8 @@ fn suspend_and_resume() {
     struct Model(usize);
     impl nutmeg::Model for Model {
         fn render(&mut self, _width: usize) -> String {
-        format!("XX: {}", self.0)
-    }
+            format!("XX: {}", self.0)
+        }
     }
     let mut out: Vec<u8> = Vec::new();
     let model = Model(0);
@@ -70,13 +70,13 @@ fn suspend_and_resume() {
         }
         view.update(|model| model.0 = i);
     }
-    view.abandon();    // No erasure commands, just a newline after the last painted view.
-    // * 0 is painted before it's suspended.
-    // * the bar is then erased
-    // * 1 is never painted because the bar is suspended.
-    // * 2 is also updated into the model while the bar is suspended, but then
-    //   it's resumed, so 2 is then painted.
-    // * 3 and 4 are painted in the usual way.
+    view.abandon(); // No erasure commands, just a newline after the last painted view.
+                    // * 0 is painted before it's suspended.
+                    // * the bar is then erased
+                    // * 1 is never painted because the bar is suspended.
+                    // * 2 is also updated into the model while the bar is suspended, but then
+                    //   it's resumed, so 2 is then painted.
+                    // * 3 and 4 are painted in the usual way.
     assert_eq!(
         String::from_utf8(out).unwrap(),
         "\x1b[1G\x1b[?7l\x1b[0KXX: 0\
