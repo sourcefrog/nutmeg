@@ -109,6 +109,9 @@
 //! ## 0.0.1
 //!
 //! * Rate-limit updates to the terminal, controlled by [ViewOptions::update_interval].
+//! 
+//! * Fix a bug where the bar was sometimes not correctly erased
+//!   by [View::suspend].
 
 #![warn(missing_docs)]
 
@@ -442,6 +445,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
                     ansi::ENABLE_LINE_WRAP,
                 )
                 .unwrap();
+                self.out.flush()?;
                 self.state = State::None;
             }
             State::None | State::IncompleteLine | State::Printed { .. } => {}
