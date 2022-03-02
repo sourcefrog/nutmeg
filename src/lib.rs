@@ -113,7 +113,7 @@
 //! ## 0.0.1
 //!
 //! * Rate-limit updates to the terminal, controlled by
-//!   [ViewOptions::update_interval].
+//!   [ViewOptions::update_interval] and [ViewOptions::print_holdoff].
 //!
 //! * Fix a bug where the bar was sometimes not correctly erased
 //!   by [View::suspend].
@@ -471,13 +471,13 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             return Ok(0);
         }
         self.hide()?;
-        if buf.ends_with(b"\n") {
-            self.state = State::Printed {
+        self.state = if buf.ends_with(b"\n") {
+            State::Printed {
                 since: Instant::now(),
-            };
+            }
         } else {
-            self.state = State::IncompleteLine;
-        }
+            State::IncompleteLine
+        };
         self.out.write_all(buf)?;
         self.out.flush()?;
         Ok(buf.len())
@@ -540,6 +540,20 @@ impl ViewOptions {
             ..self
         }
     }
+
+    /// Set the minimal interval between printing a message and painting
+    /// the progress bar.
+    ///
+    /// This is used to avoid the bar flickering if the application is
+    /// repeatedly printing messages at short intervals.
+    ///
+    /// `Duration::ZERO` can be used to disable this behavior.
+    pub fn print_holdoff(self, print_holdoff: Duration) -> ViewOptions {
+        ViewOptions {
+            print_holdoff,
+            ..self
+        }
+    }
 }
 
 impl Default for ViewOptions {
@@ -549,7 +563,7 @@ impl Default for ViewOptions {
     fn default() -> ViewOptions {
         ViewOptions {
             update_interval: Duration::from_millis(200),
-            print_holdoff: Duration::ZERO,
+            print_holdoff: Duration::from_millis(200),
             progress_enabled: true,
         }
     }
