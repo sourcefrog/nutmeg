@@ -3,6 +3,7 @@
 //! API tests for Nutmeg.
 
 use std::io::Write;
+use std::time::Duration;
 
 use pretty_assertions::assert_eq;
 
@@ -59,7 +60,8 @@ fn suspend_and_resume() {
     }
     let mut out: Vec<u8> = Vec::new();
     let model = Model(0);
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::ViewOptions::default()
+        .update_interval(Duration::ZERO);
     let view = nutmeg::View::write_to(model, options, &mut out, 90);
 
     for i in 0..=4 {

@@ -1,6 +1,6 @@
 [package]
 name = "nutmeg"
-version = "0.0.0"
+version = "0.0.1-pre"
 edition = "2021"
 description = "Draw flexible progress bars and console output"
 license = "MIT"

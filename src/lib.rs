@@ -105,13 +105,17 @@
 //! ## 0.0.0
 //!
 //! * First release.
+//! 
+//! ## 0.0.1
+//! 
+//! * Rate-limit updates to the terminal, controlled by [ViewOptions::update_interval].
 
 #![warn(missing_docs)]
 
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod ansi;
 mod width;
@@ -327,24 +331,33 @@ struct InnerView<M: Model, Out: Write> {
     /// Stream to write to the terminal.
     out: Out,
 
-    /// True if the progress output is currently drawn to the screen.
-    progress_drawn: bool,
-
     /// True if the progress bar is suspended, and should not be drawn.
     suspended: bool,
+
+    /// Whether the progress bar is drawn, etc.
+    state: State,
 
     /// Number of lines the cursor is below the line where the progress bar
     /// should next be drawn.
     cursor_y: usize,
 
-    /// True if there's an incomplete line of output printed, and the
-    /// progress bar can't be drawn until it's completed.
-    incomplete_line: bool,
-
     options: ViewOptions,
 
     /// How to determine the terminal width before output is rendered.
     width_strategy: WidthStrategy,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum State {
+    /// Progress is not visible and nothing was recently printed.
+    None,
+    /// Progress bar is currently displayed.
+    ProgressDrawn { since: Instant },
+    /// Messages were written, and the progress bar is not visible.
+    Printed { since: Instant },
+    /// An incomplete message line has been printed, so the progress bar can't
+    /// be drawn until it's removed.
+    IncompleteLine,
 }
 
 impl<M: Model, Out: Write> InnerView<M, Out> {
@@ -359,16 +372,29 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             model,
             options,
             width_strategy,
-            progress_drawn: false,
-            cursor_y: 0,
-            incomplete_line: false,
+            state: State::None,
             suspended: false,
+            cursor_y: 0,
         }
     }
 
     fn paint_progress(&mut self) -> io::Result<()> {
-        if !self.options.progress_enabled || self.incomplete_line || self.suspended {
+        if !self.options.progress_enabled || self.suspended {
             return Ok(());
+        }
+        match self.state {
+            State::IncompleteLine => return Ok(()),
+            State::None => (),
+            State::Printed { since } => {
+                if since.elapsed() < self.options.print_holdoff {
+                    return Ok(());
+                }
+            }
+            State::ProgressDrawn { since } => {
+                if since.elapsed() < self.options.update_interval {
+                    return Ok(());
+                }
+            }
         }
         if let Some(width) = self.width_strategy.width() {
             // TODO: Throttle, and keep track of the last update.
@@ -383,8 +409,9 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
                 rendered,
             )?;
             self.out.flush()?;
-
-            self.progress_drawn = true;
+            self.state = State::ProgressDrawn {
+                since: Instant::now(),
+            };
             self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
         }
         Ok(())
@@ -404,18 +431,20 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     /// Clear the progress bars off the screen, leaving it ready to
     /// print other output.
     fn hide(&mut self) -> io::Result<()> {
-        if self.progress_drawn {
-            // todo!("move up the right number of lines then clear downwards, then update model");
-            write!(
-                self.out,
-                "{}{}{}",
-                ansi::up_n_lines_and_home(self.cursor_y),
-                ansi::CLEAR_TO_END_OF_SCREEN,
-                ansi::ENABLE_LINE_WRAP,
-            )
-            .unwrap();
-            self.progress_drawn = false;
-            self.cursor_y = 0;
+        match self.state {
+            State::ProgressDrawn { .. } => {
+                write!(
+                    self.out,
+                    "{}{}{}",
+                    ansi::up_n_lines_and_home(self.cursor_y),
+                    ansi::CLEAR_TO_END_OF_SCREEN,
+                    ansi::ENABLE_LINE_WRAP,
+                )
+                .unwrap();
+                self.cursor_y = 0;
+                self.state = State::None;
+            }
+            State::None | State::IncompleteLine | State::Printed { .. } => {}
         }
         Ok(())
     }
@@ -429,14 +458,16 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     }
 
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Some(last) = buf.last() {
-            self.incomplete_line = *last != b'\n';
-        } else {
+        if buf.is_empty() {
             return Ok(0);
         }
         self.hide()?;
-        if !buf.ends_with(b"\n") {
-            self.incomplete_line = true;
+        if buf.ends_with(b"\n") {
+            self.state = State::Printed {
+                since: Instant::now(),
+            };
+        } else {
+            self.state = State::IncompleteLine;
         }
         self.out.write_all(buf)?;
         self.out.flush()?;
@@ -444,10 +475,13 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     }
 
     fn abandon(&mut self) -> io::Result<()> {
-        if self.progress_drawn {
-            self.out.write(b"\n")?;
+        match self.state {
+            State::ProgressDrawn { .. } => {
+                self.out.write_all(b"\n")?;
+            }
+            State::IncompleteLine | State::None | State::Printed { .. } => (),
         }
-        self.progress_drawn = false; // so that drop does not attempt to erase
+        self.state = State::None; // so that drop does not attempt to erase
         Ok(())
     }
 }
@@ -487,16 +521,26 @@ impl ViewOptions {
             ..self
         }
     }
+
+    /// Set the minimal interval to repaint the progress bar.
+    /// 
+    /// `Duration::ZERO` can be used to cause the bar to repaint on every update.
+    pub fn update_interval(self, update_interval: Duration) -> ViewOptions {
+        ViewOptions {
+            update_interval,
+            ..self
+        }
+    }
 }
 
 impl Default for ViewOptions {
     /// Create default reasonable view options.
     ///
-    /// The update interval and print holdoff are 250ms, and the progress bar is enabled.
+    /// The update interval and print holdoff are 200ms, and the progress bar is enabled.
     fn default() -> ViewOptions {
         ViewOptions {
-            update_interval: Duration::from_millis(250),
-            print_holdoff: Duration::from_millis(250),
+            update_interval: Duration::from_millis(200),
+            print_holdoff: Duration::from_millis(200),
             progress_enabled: true,
         }
     }
