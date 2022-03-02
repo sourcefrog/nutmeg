@@ -1,122 +1,125 @@
 // Copyright 2022 Martin Pool.
 
-//! Nutmeg draws terminal progress bars whose appearance is completely controlled
-//! by the application.
-//!
-//! # Concept
-//!
-//! By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
-//! concept of what the progress bar or indicator should look like: this is
-//! entirely under the control of the application.
-//!
-//! Nutmeg only supports ANSI terminals, which are supported on all Unix
-//! and Windows 10 and later.
-//!
-//! The application is responsible for:
-//!
-//! 1. Defining a type holds whatever information is relevant to drawing
-//!    progress bars.
-//! 2. Rendering that information into styled text lines, by implementing the
-//!    single-method trait [Model::render].
-//!    * The application can control colors and styling by including ANSI
-//!      escape sequences in the rendered string, for example by using the
-//!      `yansi` crate.
-//!    * The application is responsible for deciding whether or not to   
-//!      color its output, for example by consulting `$CLICOLORS`.
-//! 3. Constructing a [View] to draw a progress bar.
-//! 4. Updating the model when appropriate by calling [View::update].
-//! 5. Printing text output via the [View] while it is in use, to avoid the
-//!    display getting scrambled.
-//!
-//! The Nutmeg library is responsible for:
-//!
-//! * Periodically drawing the progress bar in response to updates, including
-//!   * Horizontally truncating output to fit on the screen.
-//!   * Handling changes in the number of lines of progress display.
-//! * Removing the progress bar when the view is finished or dropped.
-//! * Coordinating to hide the bar to print text output, and restore it
-//!   afterwards.
-//! * Limiting the rate at which updates are drawn to the screen.
-//! * Disabling progress if stdout is not a terminal.
-//!
-//! Errors in writing to the terminal cause a panic.
-//!
-//! # Example
-//!
-//! ```
-//! use std::io::Write;
-//!
-//! // 1. Define a struct holding all the application state necessary to
-//! // render the progress bar.
-//! #[derive(Default)]
-//! struct Model {
-//!     i: usize,
-//!     total: usize,
-//!     last_file_name: String,
-//! }
-//!
-//! // 2. Define how to render the progress bar as a String.
-//! impl nutmeg::Model for Model {
-//!     fn render(&mut self, _width: usize) -> String {
-//!         format!("{}/{}: {}", self.i, self.total, self.last_file_name)
-//!     }
-//! }
-//!
-//! fn main() -> std::io::Result<()> {
-//!     // 3. Create a View when you want to draw a progress bar.
-//!     let mut view = nutmeg::View::new(Model::default(),
-//!         nutmeg::ViewOptions::default());
-//!
-//!     // 4. As the application runs, update the model via the view.
-//!     for i in 0..100 {
-//!         view.update(|model| {
-//!             model.i += 1;
-//!             model.last_file_name = format!("file{}.txt", i);
-//!         });
-//!         // 5. Interleave text output lines by writing to the view.
-//!         if i % 10 == 3 {
-//!             writeln!(view, "reached {}", i)?;
-//!         }
-//!     }
-//!
-//!     // 5. The bar is automatically erased when dropped.
-//!     Ok(())
-//! }
-//! ```
-//!
-//! See the `examples/` directory for more.
-//!
-//! # Potential future features
-//!
-//! * Draw updates from a background thread, so that it will keep ticking even
-//!   if not actively updated, and to better handle applications that send a
-//!   burst of updates followed by a long pause. The background thread will
-//!   eventually paint the last drawn update.
-//!
-//! * Also set the window title from the progress model, perhaps by a different
-//!   render function?
-//!
-//! * Better detection of when to draw progress or not. Possibly look at
-//!   `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
-//!   <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
-//!
-//! # Changelog
-//!
-//! ## 0.0.0
-//!
-//! * The application has complete control of styling, including coloring etc.
-//! * Draw and erase progress bars.
-//! * Write messages "under" the progress bar with `writeln!(view, ...)`. The
-//!   bar is automatically suspended and restored. If the message has no final
-//!   newline, the bar remains suspended until the line is completed.
-//!
-//! ## 0.0.1
-//!
-//! * Rate-limit updates to the terminal, controlled by
-//!   [ViewOptions::update_interval] and [ViewOptions::print_holdoff].
-//!
-//! * Fix a bug where the bar was sometimes not correctly erased
-//!   by [View::suspend].
+/*!
+
+Nutmeg draws terminal progress bars whose appearance is completely controlled
+by the application.
+
+# Concept
+
+By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
+concept of what the progress bar or indicator should look like: this is
+entirely under the control of the application.
+
+Nutmeg only supports ANSI terminals, which are supported on all Unix
+and Windows 10 and later.
+
+The application is responsible for:
+
+1. Defining a type holds whatever information is relevant to drawing
+   progress bars.
+2. Rendering that information into styled text lines, by implementing the
+   single-method trait [Model::render].
+   * The application can control colors and styling by including ANSI
+     escape sequences in the rendered string, for example by using the
+     `yansi` crate.
+   * The application is responsible for deciding whether or not to
+     color its output, for example by consulting `$CLICOLORS`.
+3. Constructing a [View] to draw a progress bar.
+4. Updating the model when appropriate by calling [View::update].
+5. Printing text output via the [View] while it is in use, to avoid the
+   display getting scrambled.
+
+The Nutmeg library is responsible for:
+
+* Periodically drawing the progress bar in response to updates, including
+  * Horizontally truncating output to fit on the screen.
+  * Handling changes in the number of lines of progress display.
+* Removing the progress bar when the view is finished or dropped.
+* Coordinating to hide the bar to print text output, and restore it
+  afterwards.
+* Limiting the rate at which updates are drawn to the screen.
+* Disabling progress if stdout is not a terminal.
+
+Errors in writing to the terminal cause a panic.
+
+# Example
+
+```
+use std::io::Write;
+
+// 1. Define a struct holding all the application state necessary to
+// render the progress bar.
+#[derive(Default)]
+struct Model {
+    i: usize,
+    total: usize,
+    last_file_name: String,
+}
+
+// 2. Define how to render the progress bar as a String.
+impl nutmeg::Model for Model {
+    fn render(&mut self, _width: usize) -> String {
+        format!("{}/{}: {}", self.i, self.total, self.last_file_name)
+    }
+}
+
+fn main() -> std::io::Result<()> {
+    // 3. Create a View when you want to draw a progress bar.
+    let mut view = nutmeg::View::new(Model::default(),
+        nutmeg::ViewOptions::default());
+
+    // 4. As the application runs, update the model via the view.
+    for i in 0..100 {
+        view.update(|model| {
+            model.i += 1;
+            model.last_file_name = format!("file{}.txt", i);
+        });
+        // 5. Interleave text output lines by writing to the view.
+        if i % 10 == 3 {
+            writeln!(view, "reached {}", i)?;
+        }
+    }
+
+    // 5. The bar is automatically erased when dropped.
+    Ok(())
+}
+```
+
+See the `examples/` directory for more.
+
+# Potential future features
+
+* Draw updates from a background thread, so that it will keep ticking even
+  if not actively updated, and to better handle applications that send a
+  burst of updates followed by a long pause. The background thread will
+  eventually paint the last drawn update.
+
+* Also set the window title from the progress model, perhaps by a different
+  render function?
+
+* Better detection of when to draw progress or not. Possibly look at
+  `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
+  <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
+
+# Changelog
+
+## 0.0.0
+
+* The application has complete control of styling, including coloring etc.
+* Draw and erase progress bars.
+* Write messages "under" the progress bar with `writeln!(view, ...)`. The
+  bar is automatically suspended and restored. If the message has no final
+  newline, the bar remains suspended until the line is completed.
+
+## 0.0.1
+
+* Rate-limit updates to the terminal, controlled by
+  [ViewOptions::update_interval] and [ViewOptions::print_holdoff].
+
+* Fix a bug where the bar was sometimes not correctly erased
+  by [View::suspend].
+*/
 
 #![warn(missing_docs)]
 
