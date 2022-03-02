@@ -540,7 +540,7 @@ impl Default for ViewOptions {
     fn default() -> ViewOptions {
         ViewOptions {
             update_interval: Duration::from_millis(200),
-            print_holdoff: Duration::from_millis(200),
+            print_holdoff: Duration::ZERO,
             progress_enabled: true,
         }
     }
