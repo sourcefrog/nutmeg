@@ -29,7 +29,7 @@ fn draw_progress_once() {
 
     assert_eq!(
         String::from_utf8(out).unwrap(),
-        "\x1b[1G\x1b[?7l\x1b[0K  count: 1\n    bar: *\x1b[1F\x1b[0J\x1b[?7h"
+        "\x1b[?7l\x1b[0K  count: 1\n    bar: *\x1b[1F\x1b[0J\x1b[?7h"
     );
 }
 
@@ -46,7 +46,7 @@ fn abandoned_bar_is_not_erased() {
     // No erasure commands, just a newline after the last painted view.
     assert_eq!(
         String::from_utf8(out).unwrap(),
-        "\x1b[1G\x1b[?7l\x1b[0K  count: 1\n    bar: *\n"
+        "\x1b[?7l\x1b[0K  count: 1\n    bar: *\n"
     );
 }
 
@@ -81,9 +81,9 @@ fn suspend_and_resume() {
                     // * 3 and 4 are painted in the usual way.
     assert_eq!(
         String::from_utf8(out).unwrap(),
-        "\x1b[1G\x1b[?7l\x1b[0KXX: 0\
+        "\x1b[?7l\x1b[0KXX: 0\
         \x1b[1G\x1b[0J\x1b[?7h\
-        \x1b[1G\x1b[?7l\x1b[0KXX: 2\
+        \x1b[?7l\x1b[0KXX: 2\
         \x1b[1G\x1b[?7l\x1b[0KXX: 3\
         \x1b[1G\x1b[?7l\x1b[0KXX: 4\n"
     );
@@ -144,6 +144,6 @@ fn default_width_when_not_on_stdout() {
 
     assert_eq!(
         String::from_utf8(out).unwrap(),
-        "\x1b[1G\x1b[?7l\x1b[0Kwidth=100\x1b[1G\x1b[0J\x1b[?7h"
+        "\x1b[?7l\x1b[0Kwidth=100\x1b[1G\x1b[0J\x1b[?7h"
     );
 }

@@ -105,9 +105,9 @@
 //! ## 0.0.0
 //!
 //! * First release.
-//! 
+//!
 //! ## 0.0.1
-//! 
+//!
 //! * Rate-limit updates to the terminal, controlled by [ViewOptions::update_interval].
 
 #![warn(missing_docs)]
@@ -337,10 +337,6 @@ struct InnerView<M: Model, Out: Write> {
     /// Whether the progress bar is drawn, etc.
     state: State,
 
-    /// Number of lines the cursor is below the line where the progress bar
-    /// should next be drawn.
-    cursor_y: usize,
-
     options: ViewOptions,
 
     /// How to determine the terminal width before output is rendered.
@@ -352,7 +348,12 @@ enum State {
     /// Progress is not visible and nothing was recently printed.
     None,
     /// Progress bar is currently displayed.
-    ProgressDrawn { since: Instant },
+    ProgressDrawn {
+        since: Instant,
+        /// Number of lines the cursor is below the line where the progress bar
+        /// should next be drawn.
+        cursor_y: usize,
+    },
     /// Messages were written, and the progress bar is not visible.
     Printed { since: Instant },
     /// An incomplete message line has been printed, so the progress bar can't
@@ -374,7 +375,6 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             width_strategy,
             state: State::None,
             suspended: false,
-            cursor_y: 0,
         }
     }
 
@@ -390,20 +390,21 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
                     return Ok(());
                 }
             }
-            State::ProgressDrawn { since } => {
+            State::ProgressDrawn { since, .. } => {
                 if since.elapsed() < self.options.update_interval {
                     return Ok(());
                 }
             }
         }
         if let Some(width) = self.width_strategy.width() {
-            // TODO: Throttle, and keep track of the last update.
             let rendered = self.model.render(width);
             let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+            if let State::ProgressDrawn { cursor_y, .. } = self.state {
+                write!(self.out, "{}", ansi::up_n_lines_and_home(cursor_y))?;
+            }
             write!(
                 self.out,
-                "{}{}{}{}",
-                ansi::up_n_lines_and_home(self.cursor_y),
+                "{}{}{}",
                 ansi::DISABLE_LINE_WRAP,
                 ansi::CLEAR_TO_END_OF_LINE,
                 rendered,
@@ -411,8 +412,8 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             self.out.flush()?;
             self.state = State::ProgressDrawn {
                 since: Instant::now(),
+                cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
             };
-            self.cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
         }
         Ok(())
     }
@@ -432,16 +433,15 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     /// print other output.
     fn hide(&mut self) -> io::Result<()> {
         match self.state {
-            State::ProgressDrawn { .. } => {
+            State::ProgressDrawn { cursor_y, .. } => {
                 write!(
                     self.out,
                     "{}{}{}",
-                    ansi::up_n_lines_and_home(self.cursor_y),
+                    ansi::up_n_lines_and_home(cursor_y),
                     ansi::CLEAR_TO_END_OF_SCREEN,
                     ansi::ENABLE_LINE_WRAP,
                 )
                 .unwrap();
-                self.cursor_y = 0;
                 self.state = State::None;
             }
             State::None | State::IncompleteLine | State::Printed { .. } => {}
@@ -523,7 +523,7 @@ impl ViewOptions {
     }
 
     /// Set the minimal interval to repaint the progress bar.
-    /// 
+    ///
     /// `Duration::ZERO` can be used to cause the bar to repaint on every update.
     pub fn update_interval(self, update_interval: Duration) -> ViewOptions {
         ViewOptions {
