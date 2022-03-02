@@ -46,7 +46,7 @@ Errors in writing to the terminal cause a panic.
 # Example
 
 ```
-use std::io::Write;
+use std::io::Write; // to support write!()
 
 // 1. Define a struct holding all the application state necessary to
 // render the progress bar.
@@ -79,6 +79,7 @@ fn main() -> std::io::Result<()> {
         if i % 10 == 3 {
             writeln!(view, "reached {}", i)?;
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     // 5. The bar is automatically erased when dropped.
