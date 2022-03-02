@@ -559,11 +559,11 @@ impl ViewOptions {
 impl Default for ViewOptions {
     /// Create default reasonable view options.
     ///
-    /// The update interval and print holdoff are 200ms, and the progress bar is enabled.
+    /// The update interval and print holdoff are 100ms, and the progress bar is enabled.
     fn default() -> ViewOptions {
         ViewOptions {
-            update_interval: Duration::from_millis(200),
-            print_holdoff: Duration::from_millis(200),
+            update_interval: Duration::from_millis(100),
+            print_holdoff: Duration::from_millis(100),
             progress_enabled: true,
         }
     }
