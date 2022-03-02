@@ -3,7 +3,8 @@
 //! API tests for Nutmeg.
 
 use std::io::Write;
-use std::time::Duration;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use pretty_assertions::assert_eq;
 
@@ -144,5 +145,58 @@ fn default_width_when_not_on_stdout() {
     assert_eq!(
         String::from_utf8(out).unwrap(),
         "\x1b[?7l\x1b[0Kwidth=100\x1b[1G\x1b[0J\x1b[?7h"
+    );
+}
+
+#[test]
+fn rate_limiting_with_fake_clock() {
+    struct Model {
+        draw_count: usize,
+        update_count: usize,
+    }
+    impl nutmeg::Model for Model {
+        fn render(&mut self, _width: usize) -> String {
+            self.draw_count += 1;
+            format!("update:{} draw:{}", self.update_count, self.draw_count)
+        }
+    }
+    let model = Model {
+        draw_count: 0,
+        update_count: 0,
+    };
+    let mut out: Vec<u8> = Vec::new();
+    let options = nutmeg::ViewOptions::default()
+        .fake_clock(true)
+        .update_interval(Duration::from_millis(1));
+    let mut fake_clock = Instant::now();
+    let view = nutmeg::View::write_to(model, options, &mut out, 80);
+    view.set_fake_clock(fake_clock);
+
+    // Any number of updates, but until the clock ticks only one will be drawn.
+    for _i in 0..10 {
+        view.update(|model| model.update_count += 1);
+        sleep(Duration::from_millis(10));
+    }
+    assert_eq!(view.inspect_model(|m| m.draw_count), 1);
+    assert_eq!(view.inspect_model(|m| m.update_count), 10);
+
+    // Time passes...
+    fake_clock += Duration::from_secs(1);
+    view.set_fake_clock(fake_clock);
+    // Another burst of updates, and just one of them will be drawn.
+    for _i in 0..10 {
+        view.update(|model| model.update_count += 1);
+        sleep(Duration::from_millis(10));
+    }
+    assert_eq!(view.inspect_model(|m| m.draw_count), 2);
+    assert_eq!(view.inspect_model(|m| m.update_count), 20);
+
+    drop(view);
+    assert_eq!(
+        String::from_utf8(out).unwrap(),
+        "\x1b[?7l\x1b[0Kupdate:1 draw:1\
+        \x1b[1G\
+        \x1b[?7l\x1b[0Kupdate:11 draw:2\
+        \x1b[1G\x1b[0J\x1b[?7h"
     );
 }

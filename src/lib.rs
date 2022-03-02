@@ -224,7 +224,21 @@ where
         // Nothing to do; consuming it is enough?
     }
 
-    /// Update the model, and queue a redraw of the screen for later.
+    /// Update the model, and possibly redraw the screen to reflect the
+    /// update.
+    /// 
+    /// The progress bar may be repainted with the results of the update,
+    /// if all these conditions are true:
+    /// 
+    /// * The view is not suspended (by [View::suspend]).
+    /// * Progress bars are enabled by [ViewOptions::progress_enabled].
+    /// * The terminal seems capable of drawing progress bars.
+    /// * The progress bar was not drawn too recently, as controlled by 
+    ///   [ViewOptions::update_interval].
+    /// * A message was not printed too recently, as controlled by 
+    ///   [ViewOptions::print_holdoff].
+    /// * An incomplete message line isn't pending: in other words the 
+    ///   last message written to the view, if any, had a final newline.
     pub fn update<U>(&self, update_fn: U)
     where
         U: FnOnce(&mut M),
@@ -242,9 +256,36 @@ where
         self.inner.lock().unwrap().suspend().unwrap()
     }
 
-    /// Allow the progress bar to be drawn again.
+    /// Allow the progress bar to be drawn again, reversing the effect
+    /// of [View::suspend].
     pub fn resume(&self) {
         self.inner.lock().unwrap().resume().unwrap()
+    }
+
+    /// Set the value of the fake clock, for testing.
+    /// 
+    /// Panics if [ViewOptions::fake_clock] was not previously set.
+    /// 
+    /// Moving the clock backwards in time may cause a panic.
+    pub fn set_fake_clock(&self, fake_clock: Instant) {
+        self.inner.lock().unwrap().set_fake_clock(fake_clock)
+    }
+
+    /// Inspect the view's model.
+    /// 
+    /// The function `f` is applied to the model, and then the result
+    /// of `f` is returned by `inspect_model`.
+    /// 
+    /// ```
+    /// let view = nutmeg::View::new(10, nutmeg::ViewOptions::default());
+    /// view.update(|model| *model += 3);
+    /// assert_eq!(view.inspect_model(|m| *m), 13);
+    /// ```
+    pub fn inspect_model<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&M) -> R,
+    {
+        f(&self.inner.lock().unwrap().model)
     }
 }
 
@@ -352,6 +393,9 @@ struct InnerView<M: Model, Out: Write> {
 
     /// How to determine the terminal width before output is rendered.
     width_strategy: WidthStrategy,
+
+    /// The current time on the fake clock, if it is enabled.
+    fake_clock: Instant,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -386,6 +430,16 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             width_strategy,
             state: State::None,
             suspended: false,
+            fake_clock: Instant::now(),
+        }
+    }
+
+    /// Return the real or fake clock.
+    fn clock(&self) -> Instant {
+        if self.options.fake_clock {
+            self.fake_clock
+        } else {
+            Instant::now()
         }
     }
 
@@ -393,16 +447,17 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         if !self.options.progress_enabled || self.suspended {
             return Ok(());
         }
+        let now = self.clock();
         match self.state {
             State::IncompleteLine => return Ok(()),
             State::None => (),
             State::Printed { since } => {
-                if since.elapsed() < self.options.print_holdoff {
+                if now - since < self.options.print_holdoff {
                     return Ok(());
                 }
             }
             State::ProgressDrawn { since, .. } => {
-                if since.elapsed() < self.options.update_interval {
+                if now - since < self.options.update_interval {
                     return Ok(());
                 }
             }
@@ -422,7 +477,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
             )?;
             self.out.flush()?;
             self.state = State::ProgressDrawn {
-                since: Instant::now(),
+                since: now,
                 cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
             };
         }
@@ -476,7 +531,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         self.hide()?;
         self.state = if buf.ends_with(b"\n") {
             State::Printed {
-                since: Instant::now(),
+                since: self.clock(),
             }
         } else {
             State::IncompleteLine
@@ -495,6 +550,12 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
         }
         self.state = State::None; // so that drop does not attempt to erase
         Ok(())
+    }
+
+    /// Set the value of the fake clock, for testing.
+    fn set_fake_clock(&mut self, fake_clock: Instant) {
+        assert!(self.options.fake_clock, "fake clock is not enabled");
+        self.fake_clock = fake_clock;
     }
 }
 
@@ -521,6 +582,9 @@ pub struct ViewOptions {
 
     /// Is the progress bar drawn at all?
     progress_enabled: bool,
+
+    /// Use a fake clock for testing.
+    fake_clock: bool,
 }
 
 impl ViewOptions {
@@ -557,6 +621,20 @@ impl ViewOptions {
             ..self
         }
     }
+
+    /// Enable use of a fake clock, for testing.
+    /// 
+    /// When true, all calculations of when to repaint use the fake
+    /// clock rather than the real system clock.
+    /// 
+    /// The fake clock begins at [Instant::now()] when the [View] is
+    /// constructed.
+    ///
+    /// If this is enabled the fake clock can be updated with 
+    /// [View::set_fake_clock].
+    pub fn fake_clock(self, fake_clock: bool) -> ViewOptions {
+        ViewOptions { fake_clock, ..self }
+    }
 }
 
 impl Default for ViewOptions {
@@ -568,6 +646,7 @@ impl Default for ViewOptions {
             update_interval: Duration::from_millis(100),
             print_holdoff: Duration::from_millis(100),
             progress_enabled: true,
+            fake_clock: false,
         }
     }
 }
