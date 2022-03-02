@@ -104,12 +104,17 @@
 //!
 //! ## 0.0.0
 //!
-//! * First release.
+//! * The application has complete control of styling, including coloring etc.
+//! * Draw and erase progress bars.
+//! * Write messages "under" the progress bar with `writeln!(view, ...)`. The
+//!   bar is automatically suspended and restored. If the message has no final
+//!   newline, the bar remains suspended until the line is completed.
 //!
 //! ## 0.0.1
 //!
-//! * Rate-limit updates to the terminal, controlled by [ViewOptions::update_interval].
-//! 
+//! * Rate-limit updates to the terminal, controlled by
+//!   [ViewOptions::update_interval].
+//!
 //! * Fix a bug where the bar was sometimes not correctly erased
 //!   by [View::suspend].
 

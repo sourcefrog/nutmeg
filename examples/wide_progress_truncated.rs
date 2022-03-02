@@ -25,8 +25,7 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let options = nutmeg::ViewOptions::default()
-        .update_interval(Duration::from_millis(50));
+    let options = nutmeg::ViewOptions::default().update_interval(Duration::from_millis(50));
     let model = Model { i: 0, width: 120 };
     let view = nutmeg::View::new(model, options);
     for _ in 1..=360 {
