@@ -79,7 +79,6 @@ fn main() -> std::io::Result<()> {
         if i % 10 == 3 {
             writeln!(view, "reached {}", i)?;
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     // 5. The bar is automatically erased when dropped.
