@@ -11,37 +11,38 @@ By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
 concept of what the progress bar or indicator should look like: this is
 entirely under the control of the application.
 
-Nutmeg only supports ANSI terminals, which are supported on all Unix
-and Windows 10 and later.
-
 The application is responsible for:
 
 1. Defining a type holds whatever information is relevant to drawing
    progress bars.
 2. Rendering that information into styled text lines, by implementing the
    single-method trait [Model::render].
-   * The application can control colors and styling by including ANSI
-     escape sequences in the rendered string, for example by using the
-     `yansi` crate.
-   * The application is responsible for deciding whether or not to
-     color its output, for example by consulting `$CLICOLORS`.
 3. Constructing a [View] to draw a progress bar.
 4. Updating the model when appropriate by calling [View::update].
-5. Printing text output via the [View] while it is in use, to avoid the
+5. Printing text output only via the [View] while it is in use, to avoid the
    display getting scrambled.
+
+The application can control colors and styling by including ANSI
+escape sequences in the rendered string, for example by using the
+`yansi` crate.
+
+The application is responsible for deciding whether or not to
+color its output, for example by consulting `$CLICOLORS`.
 
 The Nutmeg library is responsible for:
 
 * Periodically drawing the progress bar in response to updates, including
-  * Horizontally truncating output to fit on the screen.
-  * Handling changes in the number of lines of progress display.
+  horizontally truncating output to fit on the screen.
 * Removing the progress bar when the view is finished or dropped.
 * Coordinating to hide the bar to print text output, and restore it
   afterwards.
 * Limiting the rate at which updates are drawn to the screen.
-* Disabling progress if stdout is not a terminal.
+* Disabling progress bars if stdout is not a terminal.
 
 Errors in writing to the terminal cause a panic.
+
+Nutmeg only supports ANSI terminals, which are supported on all Unix
+and Windows 10 and later.
 
 # Example
 
@@ -296,6 +297,8 @@ impl<M: Model> View<M, io::Stdout> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model.
+    /// 
+    /// On Windows, this enables use of ANSI sequences for styling stdout.
     pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
