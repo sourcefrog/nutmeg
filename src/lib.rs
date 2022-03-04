@@ -119,14 +119,18 @@ See the `examples/` directory for more.
 
 * Fix a bug where the bar was sometimes not correctly erased
   by [View::suspend].
+
+* Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
+
 */
 
 #![warn(missing_docs)]
 
 use std::fmt::Display;
 use std::io::{self, Write};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+use parking_lot::Mutex;
 
 mod ansi;
 mod width;
@@ -220,7 +224,7 @@ where
     pub fn abandon(self) {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
-        self.inner.lock().unwrap().abandon().unwrap();
+        self.inner.lock().abandon().unwrap();
         // Nothing to do; consuming it is enough?
     }
 
@@ -245,7 +249,6 @@ where
     {
         self.inner
             .lock()
-            .unwrap()
             .update(update_fn)
             .expect("progress update failed")
     }
@@ -253,13 +256,13 @@ where
     /// Hide the progress bar if it's currently drawn, and leave it
     /// hidden until [View::resume] is called.
     pub fn suspend(&self) {
-        self.inner.lock().unwrap().suspend().unwrap()
+        self.inner.lock().suspend().unwrap()
     }
 
     /// Allow the progress bar to be drawn again, reversing the effect
     /// of [View::suspend].
     pub fn resume(&self) {
-        self.inner.lock().unwrap().resume().unwrap()
+        self.inner.lock().resume().unwrap()
     }
 
     /// Set the value of the fake clock, for testing.
@@ -268,7 +271,7 @@ where
     /// 
     /// Moving the clock backwards in time may cause a panic.
     pub fn set_fake_clock(&self, fake_clock: Instant) {
-        self.inner.lock().unwrap().set_fake_clock(fake_clock)
+        self.inner.lock().set_fake_clock(fake_clock)
     }
 
     /// Inspect the view's model.
@@ -285,7 +288,7 @@ where
     where
         F: FnOnce(&M) -> R,
     {
-        f(&self.inner.lock().unwrap().model)
+        f(&self.inner.lock().model)
     }
 }
 
@@ -357,7 +360,7 @@ impl<M: Model, Out: Write> io::Write for View<M, Out> {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.inner.lock().unwrap().write(buf)
+        self.inner.lock().write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -369,7 +372,7 @@ impl<M: Model, Out: Write> Drop for View<M, Out> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
-        if let Ok(mut inner) = self.inner.try_lock() {
+        if let Some(mut inner) = self.inner.try_lock() {
             let _ = inner.hide();
         }
     }
