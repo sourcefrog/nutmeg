@@ -3,6 +3,7 @@
 https://github.com/sourcefrog/cargo-mutants
 
 [![Tests](https://github.com/sourcefrog/nutmeg/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/sourcefrog/nutmeg/actions/workflows/tests.yml?query=branch%3Amain)
+[![docs.rs](https://docs.rs/nutmeg/badge.svg)](https://docs.rs/nutmeg)
 [![crates.io](https://img.shields.io/crates/v/nutmeg.svg)](https://crates.io/crates/nutmeg)
 [![libs.rs](https://img.shields.io/badge/libs.rs-nutmeg-blue)](https://lib.rs/crates/nutmeg)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-blue.svg)
