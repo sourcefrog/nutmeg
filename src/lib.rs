@@ -123,6 +123,10 @@ See the `examples/` directory for more.
 
 * Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
 
+## 0.0.2
+
+* Fix a bug that caused leftover text when multi-line bars shrink in width.
+
 */
 
 #![warn(missing_docs)]
@@ -478,7 +482,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
                 self.out,
                 "{}{}{}",
                 ansi::DISABLE_LINE_WRAP,
-                ansi::CLEAR_TO_END_OF_LINE,
+                ansi::CLEAR_TO_END_OF_SCREEN,
                 rendered,
             )?;
             self.out.flush()?;
