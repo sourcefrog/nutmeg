@@ -12,8 +12,9 @@ struct Model {
 
 impl nutmeg::Model for Model {
     fn render(&mut self, _width: usize) -> String {
+        let long_text = self.i.to_string().repeat(40 - self.i);
         format!(
-            "  count: {}\n    bar: {}\nelapsed: {:.1}s\n  blink: {}",
+            "  count: {}\n    bar: {}\nelapsed: {:.1}s\n  blink: {}\n   long: {}",
             self.i,
             "*".repeat(self.i),
             self.start.elapsed().as_secs_f32(),
@@ -22,6 +23,7 @@ impl nutmeg::Model for Model {
             } else {
                 Paint::yellow("XXX")
             },
+            long_text,
         )
     }
 }
