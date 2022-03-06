@@ -138,10 +138,12 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 mod ansi;
+mod to_print;
 mod width;
 #[cfg(windows)]
 mod windows;
 
+use crate::to_print::WriteToPrint;
 use crate::width::WidthStrategy;
 
 /// An application-defined type that holds whatever state is relevant to the
@@ -235,18 +237,18 @@ where
 
     /// Update the model, and possibly redraw the screen to reflect the
     /// update.
-    /// 
+    ///
     /// The progress bar may be repainted with the results of the update,
     /// if all these conditions are true:
-    /// 
+    ///
     /// * The view is not suspended (by [View::suspend]).
     /// * Progress bars are enabled by [ViewOptions::progress_enabled].
     /// * The terminal seems capable of drawing progress bars.
-    /// * The progress bar was not drawn too recently, as controlled by 
+    /// * The progress bar was not drawn too recently, as controlled by
     ///   [ViewOptions::update_interval].
-    /// * A message was not printed too recently, as controlled by 
+    /// * A message was not printed too recently, as controlled by
     ///   [ViewOptions::print_holdoff].
-    /// * An incomplete message line isn't pending: in other words the 
+    /// * An incomplete message line isn't pending: in other words the
     ///   last message written to the view, if any, had a final newline.
     pub fn update<U>(&self, update_fn: U)
     where
@@ -271,19 +273,19 @@ where
     }
 
     /// Set the value of the fake clock, for testing.
-    /// 
+    ///
     /// Panics if [ViewOptions::fake_clock] was not previously set.
-    /// 
+    ///
     /// Moving the clock backwards in time may cause a panic.
     pub fn set_fake_clock(&self, fake_clock: Instant) {
         self.inner.lock().set_fake_clock(fake_clock)
     }
 
     /// Inspect the view's model.
-    /// 
+    ///
     /// The function `f` is applied to the model, and then the result
     /// of `f` is returned by `inspect_model`.
-    /// 
+    ///
     /// ```
     /// let view = nutmeg::View::new(10, nutmeg::ViewOptions::default());
     /// view.update(|model| *model += 3);
@@ -297,20 +299,30 @@ where
     }
 }
 
-impl<M: Model> View<M, io::Stdout> {
+impl<M: Model> View<M, WriteToPrint> {
     /// Construct a new progress view, drawn to stdout.
     ///
-    /// `model` is the application-defined initial model.
-    /// 
+    /// `model` is the application-defined initial model. The View takes
+    /// ownership of the model, after which the application can update
+    /// it through [View::update].
+    ///
     /// On Windows, this enables use of ANSI sequences for styling stdout.
-    pub fn new(model: M, mut options: ViewOptions) -> View<M, io::Stdout> {
+    ///
+    /// Even if progress bars are enabled in the [ViewOptions], they will be
+    /// disabled if stdout is not a tty, or if it does not support ANSI
+    /// sequences (on Windows).
+    ///
+    /// This constructor arranges that output from the progress view will be
+    /// captured by the Rust test framework and not leak to stdout, but
+    /// detection of whether to show progress bars may not work correctly.
+    pub fn new(model: M, mut options: ViewOptions) -> View<M, WriteToPrint> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                io::stdout(),
+                WriteToPrint {},
                 options,
                 WidthStrategy::Stdout,
             )),
@@ -321,7 +333,8 @@ impl<M: Model> View<M, io::Stdout> {
 impl<M: Model> View<M, io::Stderr> {
     /// Construct a new progress view, drawn to stderr.
     ///
-    /// `model` is the application-defined initial model.
+    /// This is the same as [View::new] except that the progress bar, and
+    /// any messages emitted through it, are sent to stderr.
     pub fn to_stderr(model: M, mut options: ViewOptions) -> View<M, io::Stderr> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
@@ -633,14 +646,14 @@ impl ViewOptions {
     }
 
     /// Enable use of a fake clock, for testing.
-    /// 
+    ///
     /// When true, all calculations of when to repaint use the fake
     /// clock rather than the real system clock.
-    /// 
+    ///
     /// The fake clock begins at [Instant::now()] when the [View] is
     /// constructed.
     ///
-    /// If this is enabled the fake clock can be updated with 
+    /// If this is enabled the fake clock can be updated with
     /// [View::set_fake_clock].
     pub fn fake_clock(self, fake_clock: bool) -> ViewOptions {
         ViewOptions { fake_clock, ..self }
