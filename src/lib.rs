@@ -143,7 +143,7 @@ mod width;
 #[cfg(windows)]
 mod windows;
 
-use crate::to_print::WriteToPrint;
+use crate::to_print::{WriteToPrint, WriteToStderr};
 use crate::width::WidthStrategy;
 
 /// An application-defined type that holds whatever state is relevant to the
@@ -330,19 +330,19 @@ impl<M: Model> View<M, WriteToPrint> {
     }
 }
 
-impl<M: Model> View<M, io::Stderr> {
+impl<M: Model> View<M, WriteToStderr> {
     /// Construct a new progress view, drawn to stderr.
     ///
     /// This is the same as [View::new] except that the progress bar, and
     /// any messages emitted through it, are sent to stderr.
-    pub fn to_stderr(model: M, mut options: ViewOptions) -> View<M, io::Stderr> {
+    pub fn to_stderr(model: M, mut options: ViewOptions) -> View<M, WriteToStderr> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                io::stderr(),
+                WriteToStderr{},
                 options,
                 WidthStrategy::Stderr,
             )),

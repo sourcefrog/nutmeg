@@ -10,8 +10,8 @@ use std::fmt;
 use std::io;
 use std::str;
 
-/// Arranges for written output to be sent to `print!` so that
-/// it will be captured in Rust unit tests.
+/// Routes output from `Write` to `print!` so that it will be captured in Rust
+/// unit tests and otherwise go to stdout.
 ///
 /// (Unit tests currently don't capture file handles opened by
 /// [std::io::stdout].)
@@ -28,6 +28,22 @@ impl fmt::Write for WriteToPrint {
 impl io::Write for WriteToPrint {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         print!("{}", str::from_utf8(buf).unwrap());
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Routes output from `Write` to `eprint!` so that it will be captured in Rust
+/// unit tests and otherwise go to stderr.
+#[non_exhaustive]
+pub struct WriteToStderr {}
+
+impl io::Write for WriteToStderr {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        eprint!("{}", str::from_utf8(buf).unwrap());
         Ok(buf.len())
     }
 
