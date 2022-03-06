@@ -123,9 +123,13 @@ See the `examples/` directory for more.
 
 * Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
 
-## 0.0.2
+## 0.0.2 UNRELEASED
 
-* Fix a bug that caused leftover text when multi-line bars shrink in width.
+* Fixed: A bug that caused leftover text when multi-line bars shrink in width.
+
+* Fixed: The output from bars created with [View::new] and [View::stderr] in 
+  Rust tests is captured with the test output rather than leaking through
+  to cargo's output.
 
 */
 
