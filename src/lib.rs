@@ -127,7 +127,7 @@ See the `examples/` directory for more.
 
 * Fixed: A bug that caused leftover text when multi-line bars shrink in width.
 
-* Fixed: The output from bars created with [View::new] and [View::stderr] in 
+* Fixed: The output from bars created with [View::new] and [View::stderr] in
   Rust tests is captured with the test output rather than leaking through
   to cargo's output.
 
@@ -346,7 +346,7 @@ impl<M: Model> View<M, WriteToStderr> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                WriteToStderr{},
+                WriteToStderr {},
                 options,
                 WidthStrategy::Stderr,
             )),
