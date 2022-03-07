@@ -5,7 +5,7 @@
 //!
 //! This module implements a bit of a hack to get default progress output
 //! captured, by redirecting a `Write` into `print!`.
-//! 
+//!
 //! For context on this weird workaround see
 //! <https://github.com/rust-lang/rust/issues/31343>.
 

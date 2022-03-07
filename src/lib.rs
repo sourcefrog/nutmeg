@@ -307,32 +307,35 @@ where
     }
 
     /// Print a message to the view.
-    /// 
-    /// The progress bar, if present, is removed to print the message 
+    ///
+    /// The progress bar, if present, is removed to print the message
     /// and then remains off for a time controlled by [Options::print_holdoff].
-    /// 
+    ///
     /// The message may contain ANSI control codes for styling.
-    /// 
+    ///
     /// The message may contain multiple lines.
-    /// 
+    ///
     /// If the last character of the message is *not* '\n' then the incomplete
     /// line remains on the terminal, and the progress bar will not be painted
     /// until it is completed by a message finishing in `\n`.
-    /// 
+    ///
     /// This is equivalent to `write!(view, ...)` except:
     /// * [std::io::Write::write] requires a `&mut View`, while `message`
     ///   can be called on a `&View`.
     /// * `message` panics on an error writing to the terminal; `write!` requires
     ///   the caller to handle a `Result`.
     /// * `write!` integrates string formatting; `message` does not.
-    /// 
+    ///
     /// ```
     /// let view = nutmeg::View::new(0, nutmeg::Options::default());
     /// // ...
     /// view.message(&format!("{} splines reticulated\n", 42));
     /// ```
     pub fn message(&self, message: &str) {
-        self.inner.lock().write(message.as_bytes()).expect("writing message");
+        self.inner
+            .lock()
+            .write(message.as_bytes())
+            .expect("writing message");
     }
 }
 

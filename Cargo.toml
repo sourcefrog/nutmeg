@@ -16,3 +16,4 @@ yansi = "0.5"
 
 [dev-dependencies]
 pretty_assertions = "1.1"
+rand = "0.8"
