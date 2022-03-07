@@ -1,10 +1,13 @@
 // Copyright 2022 Martin Pool.
 
-//! Rust's test framework captures output sent through `println!` but
-//! not output sent through opening `stdout` or `stderr`.
+//! Rust's test framework captures output sent through `println!` but not output
+//! sent through opening `stdout` or `stderr`.
 //!
-//! This module implements a bit of a hack to get default progress
-//! output captured, by redirecting a `Write` into `print!`.
+//! This module implements a bit of a hack to get default progress output
+//! captured, by redirecting a `Write` into `print!`.
+//! 
+//! For context on this weird workaround see
+//! <https://github.com/rust-lang/rust/issues/31343>.
 
 use std::io;
 use std::str;
@@ -24,7 +27,7 @@ impl io::Write for WriteToPrint {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        io::stdout().flush()
     }
 }
 
@@ -40,6 +43,7 @@ impl io::Write for WriteToStderr {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        // probably unnecessary
+        io::stderr().flush()
     }
 }
