@@ -20,10 +20,11 @@ fn main() {
     for i in 1..=25 {
         view.update(|state| state.i += 1);
         if i % 15 == 0 {
-            writeln!(view, "fizzbuzz").unwrap();
+            view.message("fizzbuzz\n");
         } else if i % 3 == 0 {
-            writeln!(view, "fizz").unwrap();
+            view.message("fizz\n");
         } else if i % 5 == 0 {
+            // Alternatively, you can treat it as a destination for Write.
             writeln!(view, "buzz").unwrap();
         }
         thread::sleep(time::Duration::from_millis(300));

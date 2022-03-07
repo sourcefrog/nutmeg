@@ -127,10 +127,12 @@ See the `examples/` directory for more.
 
 * Fixed: A bug that caused leftover text when multi-line bars shrink in width.
 
-* Fixed: The output from bars created with [View::new] and [View::stderr] in
+* Fixed: The output from bars created with [View::new] and [View::to_stderr] in
   Rust tests is captured with the test output rather than leaking through
   to cargo's output.
 
+* New method [View::message] to print a message to the terminal, as an alternative
+  to using `write!()`.
 */
 
 #![warn(missing_docs)]
@@ -300,6 +302,35 @@ where
         F: FnOnce(&M) -> R,
     {
         f(&self.inner.lock().model)
+    }
+
+    /// Print a message to the view.
+    /// 
+    /// The progress bar, if present, is removed to print the message 
+    /// and then remains off for a time controlled by [ViewOptions::print_holdoff].
+    /// 
+    /// The message may contain ANSI control codes for styling.
+    /// 
+    /// The message may contain multiple lines.
+    /// 
+    /// If the last character of the message is *not* '\n' then the incomplete
+    /// line remains on the terminal, and the progress bar will not be painted
+    /// until it is completed by a message finishing in `\n`.
+    /// 
+    /// This is equivalent to `write!(view, ...)` except:
+    /// * [std::io::Write::write] requires a `&mut View`, while `message`
+    ///   can be called on a `&View`.
+    /// * `message` panics on an error writing to the terminal; `write!` requires
+    ///   the caller to handle a `Result`.
+    /// * `write!` integrates string formatting; `message` does not.
+    /// 
+    /// ```
+    /// let view = nutmeg::View::new(0, nutmeg::ViewOptions::default());
+    /// // ...
+    /// view.message(&format!("{} splines reticulated\n", 42));
+    /// ```
+    pub fn message(&self, message: &str) {
+        self.inner.lock().write(message.as_bytes()).expect("writing message");
     }
 }
 
