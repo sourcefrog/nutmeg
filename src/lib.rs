@@ -135,6 +135,9 @@ See the `examples/` directory for more.
 
 * New method [View::message] to print a message to the terminal, as an alternative
   to using `write!()`.
+
+* New `example/multithreaded.rs` showing how a View and Model can be shared
+  across threads.
 */
 
 #![warn(missing_docs)]
