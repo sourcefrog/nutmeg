@@ -6,7 +6,6 @@
 //! This module implements a bit of a hack to get default progress
 //! output captured, by redirecting a `Write` into `print!`.
 
-use std::fmt;
 use std::io;
 use std::str;
 
@@ -17,13 +16,6 @@ use std::str;
 /// [std::io::stdout].)
 #[non_exhaustive]
 pub struct WriteToPrint {}
-
-impl fmt::Write for WriteToPrint {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        print!("{}", s);
-        Ok(())
-    }
-}
 
 impl io::Write for WriteToPrint {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
