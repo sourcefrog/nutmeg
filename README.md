@@ -44,7 +44,9 @@ fn main() -> std::io::Result<()> {
         nutmeg::Options::default());
 
     // 4. As the application runs, update the model via the view.
-    for i in 0..100 {
+    let total_work = 100;
+    view.update(|model| model.total = total_work);
+    for i in 0..total_work {
         view.update(|model| {
             model.i += 1;
             model.last_file_name = format!("file{}.txt", i);
