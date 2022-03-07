@@ -14,7 +14,7 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let view = nutmeg::View::new(Model { i: 0 }, options);
     for i in 1..=16 {
         if i == 4 {

@@ -12,7 +12,7 @@ use std::time;
 use std::time::Duration;
 
 fn main() -> io::Result<()> {
-    let options = nutmeg::ViewOptions::default()
+    let options = nutmeg::Options::default()
         .print_holdoff(Duration::from_millis(1000))
         .update_interval(Duration::from_millis(0));
     let mut view = nutmeg::View::new(0usize, options);

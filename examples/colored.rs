@@ -18,7 +18,7 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let mut view = nutmeg::View::new(Model { i: 0 }, options);
     for i in 1..=45 {
         view.update(|state| state.i += 1);

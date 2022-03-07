@@ -21,7 +21,7 @@ fn zz() {
 }
 
 fn main() -> io::Result<()> {
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let model = Model { i: 0, legal: true };
     let mut view = nutmeg::View::new(model, options);
     for i in 1..=5 {

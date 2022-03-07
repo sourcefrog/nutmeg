@@ -22,7 +22,7 @@ impl nutmeg::Model for Model {
 }
 
 fn main() {
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let state = Model {
         i: 0,
         start_time: Instant::now(),

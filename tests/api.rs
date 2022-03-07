@@ -22,7 +22,7 @@ impl nutmeg::Model for MultiLineModel {
 fn draw_progress_once() {
     let mut out: Vec<u8> = Vec::new();
     let model = MultiLineModel { i: 0 };
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let view = nutmeg::View::write_to(model, options, &mut out, 90);
 
     view.update(|model| model.i = 1);
@@ -38,7 +38,7 @@ fn draw_progress_once() {
 fn abandoned_bar_is_not_erased() {
     let mut out: Vec<u8> = Vec::new();
     let model = MultiLineModel { i: 0 };
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let view = nutmeg::View::write_to(model, options, &mut out, 90);
 
     view.update(|model| model.i = 1);
@@ -61,7 +61,7 @@ fn suspend_and_resume() {
     }
     let mut out: Vec<u8> = Vec::new();
     let model = Model(0);
-    let options = nutmeg::ViewOptions::default().update_interval(Duration::ZERO);
+    let options = nutmeg::Options::default().update_interval(Duration::ZERO);
     let view = nutmeg::View::write_to(model, options, &mut out, 90);
 
     for i in 0..=4 {
@@ -92,7 +92,7 @@ fn suspend_and_resume() {
 fn disabled_progress_is_not_drawn() {
     let mut out: Vec<u8> = Vec::new();
     let model = MultiLineModel { i: 0 };
-    let options = nutmeg::ViewOptions::default().progress_enabled(false);
+    let options = nutmeg::Options::default().progress_enabled(false);
     let view = nutmeg::View::write_to(model, options, &mut out, 80);
 
     for i in 0..10 {
@@ -107,7 +107,7 @@ fn disabled_progress_is_not_drawn() {
 fn disabled_progress_does_not_block_print() {
     let mut out: Vec<u8> = Vec::new();
     let model = MultiLineModel { i: 0 };
-    let options = nutmeg::ViewOptions::default().progress_enabled(false);
+    let options = nutmeg::Options::default().progress_enabled(false);
     let mut view = nutmeg::View::write_to(model, options, &mut out, 80);
 
     for i in 0..2 {
@@ -136,7 +136,7 @@ fn default_width_when_not_on_stdout() {
     }
     let mut out: Vec<u8> = Vec::new();
     let model = Model();
-    let options = nutmeg::ViewOptions::default();
+    let options = nutmeg::Options::default();
     let view = nutmeg::View::write_to(model, options, &mut out, FORCED_WIDTH);
 
     view.update(|_model| ());
@@ -165,7 +165,7 @@ fn rate_limiting_with_fake_clock() {
         update_count: 0,
     };
     let mut out: Vec<u8> = Vec::new();
-    let options = nutmeg::ViewOptions::default()
+    let options = nutmeg::Options::default()
         .fake_clock(true)
         .update_interval(Duration::from_millis(1));
     let mut fake_clock = Instant::now();

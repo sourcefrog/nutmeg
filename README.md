@@ -41,7 +41,7 @@ impl nutmeg::Model for Model {
 fn main() -> std::io::Result<()> {
     // 3. Create a View when you want to draw a progress bar.
     let mut view = nutmeg::View::new(Model::default(),
-        nutmeg::ViewOptions::default());
+        nutmeg::Options::default());
 
     // 4. As the application runs, update the model via the view.
     for i in 0..100 {

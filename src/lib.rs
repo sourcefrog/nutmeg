@@ -68,7 +68,7 @@ impl nutmeg::Model for Model {
 fn main() -> std::io::Result<()> {
     // 3. Create a View when you want to draw a progress bar.
     let mut view = nutmeg::View::new(Model::default(),
-        nutmeg::ViewOptions::default());
+        nutmeg::Options::default());
 
     // 4. As the application runs, update the model via the view.
     for i in 0..100 {
@@ -116,7 +116,7 @@ See the `examples/` directory for more.
 ## 0.0.1
 
 * Rate-limit updates to the terminal, controlled by
-  [ViewOptions::update_interval] and [ViewOptions::print_holdoff].
+  `ViewOptions::update_interval` and `ViewOptions::print_holdoff`.
 
 * Fix a bug where the bar was sometimes not correctly erased
   by [View::suspend].
@@ -124,6 +124,8 @@ See the `examples/` directory for more.
 * Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
 
 ## 0.0.2 UNRELEASED
+
+* API change: Renamed `nutmeg::ViewOptions` to just `nutmeg::Options`.
 
 * Fixed: A bug that caused leftover text when multi-line bars shrink in width.
 
@@ -187,7 +189,7 @@ pub trait Model {
 /// for very basic progress indications.
 ///
 /// ```
-/// let view = nutmeg::View::new(0, nutmeg::ViewOptions::default());
+/// let view = nutmeg::View::new(0, nutmeg::Options::default());
 /// view.update(|model| *model += 1);
 /// ```
 impl<T> Model for T
@@ -248,12 +250,12 @@ where
     /// if all these conditions are true:
     ///
     /// * The view is not suspended (by [View::suspend]).
-    /// * Progress bars are enabled by [ViewOptions::progress_enabled].
+    /// * Progress bars are enabled by [Options::progress_enabled].
     /// * The terminal seems capable of drawing progress bars.
     /// * The progress bar was not drawn too recently, as controlled by
-    ///   [ViewOptions::update_interval].
+    ///   [Options::update_interval].
     /// * A message was not printed too recently, as controlled by
-    ///   [ViewOptions::print_holdoff].
+    ///   [Options::print_holdoff].
     /// * An incomplete message line isn't pending: in other words the
     ///   last message written to the view, if any, had a final newline.
     pub fn update<U>(&self, update_fn: U)
@@ -280,7 +282,7 @@ where
 
     /// Set the value of the fake clock, for testing.
     ///
-    /// Panics if [ViewOptions::fake_clock] was not previously set.
+    /// Panics if [Options::fake_clock] was not previously set.
     ///
     /// Moving the clock backwards in time may cause a panic.
     pub fn set_fake_clock(&self, fake_clock: Instant) {
@@ -293,7 +295,7 @@ where
     /// of `f` is returned by `inspect_model`.
     ///
     /// ```
-    /// let view = nutmeg::View::new(10, nutmeg::ViewOptions::default());
+    /// let view = nutmeg::View::new(10, nutmeg::Options::default());
     /// view.update(|model| *model += 3);
     /// assert_eq!(view.inspect_model(|m| *m), 13);
     /// ```
@@ -307,7 +309,7 @@ where
     /// Print a message to the view.
     /// 
     /// The progress bar, if present, is removed to print the message 
-    /// and then remains off for a time controlled by [ViewOptions::print_holdoff].
+    /// and then remains off for a time controlled by [Options::print_holdoff].
     /// 
     /// The message may contain ANSI control codes for styling.
     /// 
@@ -325,7 +327,7 @@ where
     /// * `write!` integrates string formatting; `message` does not.
     /// 
     /// ```
-    /// let view = nutmeg::View::new(0, nutmeg::ViewOptions::default());
+    /// let view = nutmeg::View::new(0, nutmeg::Options::default());
     /// // ...
     /// view.message(&format!("{} splines reticulated\n", 42));
     /// ```
@@ -343,14 +345,14 @@ impl<M: Model> View<M, WriteToPrint> {
     ///
     /// On Windows, this enables use of ANSI sequences for styling stdout.
     ///
-    /// Even if progress bars are enabled in the [ViewOptions], they will be
+    /// Even if progress bars are enabled in the [Options], they will be
     /// disabled if stdout is not a tty, or if it does not support ANSI
     /// sequences (on Windows).
     ///
     /// This constructor arranges that output from the progress view will be
     /// captured by the Rust test framework and not leak to stdout, but
     /// detection of whether to show progress bars may not work correctly.
-    pub fn new(model: M, mut options: ViewOptions) -> View<M, WriteToPrint> {
+    pub fn new(model: M, mut options: Options) -> View<M, WriteToPrint> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
@@ -370,7 +372,7 @@ impl<M: Model> View<M, WriteToStderr> {
     ///
     /// This is the same as [View::new] except that the progress bar, and
     /// any messages emitted through it, are sent to stderr.
-    pub fn to_stderr(model: M, mut options: ViewOptions) -> View<M, WriteToStderr> {
+    pub fn to_stderr(model: M, mut options: Options) -> View<M, WriteToStderr> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
@@ -398,7 +400,7 @@ impl<M: Model, W: Write> View<M, W> {
     ///
     /// Views constructed by this model use a fixed terminal width, rather
     /// than trying to dynamically measure the terminal width.
-    pub fn write_to(model: M, options: ViewOptions, out: W, width: usize) -> View<M, W> {
+    pub fn write_to(model: M, options: Options, out: W, width: usize) -> View<M, W> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
@@ -447,7 +449,7 @@ struct InnerView<M: Model, Out: Write> {
     /// Whether the progress bar is drawn, etc.
     state: State,
 
-    options: ViewOptions,
+    options: Options,
 
     /// How to determine the terminal width before output is rendered.
     width_strategy: WidthStrategy,
@@ -478,7 +480,7 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
     fn new(
         model: M,
         out: Out,
-        options: ViewOptions,
+        options: Options,
         width_strategy: WidthStrategy,
     ) -> InnerView<M, Out> {
         InnerView {
@@ -621,17 +623,17 @@ impl<M: Model, Out: Write> InnerView<M, Out> {
 ///
 /// These are supplied to a constructor like [View::new] and cannot be changed after the view is created.
 ///
-/// The default options created by [ViewOptions::default] should be reasonable
+/// The default options created by [Options::default] should be reasonable
 /// for most applications.
 ///
 /// # Example
 /// ```
-/// let options = nutmeg::ViewOptions::default()
+/// let options = nutmeg::Options::default()
 ///     .progress_enabled(false); // Don't draw bars, only print.
 /// ```
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ViewOptions {
+pub struct Options {
     /// Target interval to repaint the progress bar.
     update_interval: Duration,
 
@@ -645,12 +647,12 @@ pub struct ViewOptions {
     fake_clock: bool,
 }
 
-impl ViewOptions {
+impl Options {
     /// Set whether the progress bar will be drawn.
     ///
     /// By default it is drawn, except that this value will be ignored by [View::new] if stdout is not a terminal.
-    pub fn progress_enabled(self, progress_enabled: bool) -> ViewOptions {
-        ViewOptions {
+    pub fn progress_enabled(self, progress_enabled: bool) -> Options {
+        Options {
             progress_enabled,
             ..self
         }
@@ -659,8 +661,8 @@ impl ViewOptions {
     /// Set the minimal interval to repaint the progress bar.
     ///
     /// `Duration::ZERO` can be used to cause the bar to repaint on every update.
-    pub fn update_interval(self, update_interval: Duration) -> ViewOptions {
-        ViewOptions {
+    pub fn update_interval(self, update_interval: Duration) -> Options {
+        Options {
             update_interval,
             ..self
         }
@@ -673,8 +675,8 @@ impl ViewOptions {
     /// repeatedly printing messages at short intervals.
     ///
     /// `Duration::ZERO` can be used to disable this behavior.
-    pub fn print_holdoff(self, print_holdoff: Duration) -> ViewOptions {
-        ViewOptions {
+    pub fn print_holdoff(self, print_holdoff: Duration) -> Options {
+        Options {
             print_holdoff,
             ..self
         }
@@ -690,17 +692,17 @@ impl ViewOptions {
     ///
     /// If this is enabled the fake clock can be updated with
     /// [View::set_fake_clock].
-    pub fn fake_clock(self, fake_clock: bool) -> ViewOptions {
-        ViewOptions { fake_clock, ..self }
+    pub fn fake_clock(self, fake_clock: bool) -> Options {
+        Options { fake_clock, ..self }
     }
 }
 
-impl Default for ViewOptions {
+impl Default for Options {
     /// Create default reasonable view options.
     ///
     /// The update interval and print holdoff are 100ms, and the progress bar is enabled.
-    fn default() -> ViewOptions {
-        ViewOptions {
+    fn default() -> Options {
+        Options {
             update_interval: Duration::from_millis(100),
             print_holdoff: Duration::from_millis(100),
             progress_enabled: true,
