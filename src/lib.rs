@@ -123,7 +123,9 @@ See the `examples/` directory for more.
 
 * Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
 
-## 0.0.2 UNRELEASED
+## 0.0.2
+
+Released 2022-03-07
 
 * API change: Renamed `nutmeg::ViewOptions` to just `nutmeg::Options`.
 
