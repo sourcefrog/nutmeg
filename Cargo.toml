@@ -5,6 +5,7 @@ edition = "2018"
 description = "An unopinionated progress bar library"
 license = "MIT"
 repository = "https://github.com/sourcefrog/nutmeg"
+keywords = [ "progress", "progress-bar", "terminal", "ansi" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
