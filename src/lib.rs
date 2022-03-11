@@ -107,24 +107,6 @@ See the `examples/` directory for more.
 
 # Changelog
 
-## 0.0.0
-
-* The application has complete control of styling, including coloring etc.
-* Draw and erase progress bars.
-* Write messages "under" the progress bar with `writeln!(view, ...)`. The
-  bar is automatically suspended and restored. If the message has no final
-  newline, the bar remains suspended until the line is completed.
-
-## 0.0.1
-
-* Rate-limit updates to the terminal, controlled by
-  `ViewOptions::update_interval` and `ViewOptions::print_holdoff`.
-
-* Fix a bug where the bar was sometimes not correctly erased
-  by [View::suspend].
-
-* Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
-
 ## 0.0.2
 
 Released 2022-03-07
@@ -142,6 +124,25 @@ Released 2022-03-07
 
 * New `example/multithreaded.rs` showing how a View and Model can be shared
   across threads.
+
+## 0.0.1
+
+* Rate-limit updates to the terminal, controlled by
+  `ViewOptions::update_interval` and `ViewOptions::print_holdoff`.
+
+* Fix a bug where the bar was sometimes not correctly erased
+  by [View::suspend].
+
+* Change to [`parking_lot`](https://docs.rs/parking_lot) mutexes in the implementation.
+
+## 0.0.0
+
+* The application has complete control of styling, including coloring etc.
+* Draw and erase progress bars.
+* Write messages "under" the progress bar with `writeln!(view, ...)`. The
+  bar is automatically suspended and restored. If the message has no final
+  newline, the bar remains suspended until the line is completed.
+
 */
 
 #![warn(missing_docs)]
