@@ -107,6 +107,14 @@ See the `examples/` directory for more.
 
 # Changelog
 
+## 0.0.3
+
+Not released yet.
+
+* New: [percent_done] and [estimate_remaining] functions to help in rendering progress bars.
+
+* New: [models::StringPair].
+
 ## 0.0.2
 
 Released 2022-03-07
@@ -154,6 +162,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 mod ansi;
+mod helpers;
 pub mod models;
 mod to_print;
 mod width;
@@ -162,6 +171,8 @@ mod windows;
 
 use crate::to_print::{WriteToPrint, WriteToStderr};
 use crate::width::WidthStrategy;
+
+pub use crate::helpers::*;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
