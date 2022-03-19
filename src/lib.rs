@@ -154,6 +154,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 mod ansi;
+pub mod models;
 mod to_print;
 mod width;
 #[cfg(windows)]
