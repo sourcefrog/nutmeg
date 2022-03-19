@@ -7,7 +7,7 @@
 //! requirement to use them: they only implement the public [Model] interface.
 
 use std::borrow::Cow;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[allow(unused)] // For docstrings
 use crate::View;
@@ -72,6 +72,8 @@ impl Model for StringPair {
 /// Counting raindrops: 68/99, 68.7%, 3 sec remaining
 /// ```
 ///
+/// /// Run `cargo run --examples linear_model` in the Nutmeg source tree to see this in action.
+///
 /// # Example
 ///
 /// ```
@@ -133,5 +135,76 @@ impl Model for LinearModel {
             percent_done(self.done, self.total),
             estimate_remaining(&self.start, self.done, self.total)
         )
+    }
+}
+
+/// A model that counts up the amount of work done, with no known total, showing the elapsed time.
+///
+/// Run `cargo run --examples unbounded_model` in the Nutmeg source tree to see this in action.
+///
+/// # Example
+/// ```
+/// let progress = nutmeg::View::new(
+///     nutmeg::models::UnboundedModel::new("Counting raindrops"),
+///     nutmeg::Options::default(),
+/// );
+/// for _i in 0..=99 {
+///     progress.update(|model| model.increment(1));
+/// }
+/// ```
+pub struct UnboundedModel {
+    message: Cow<'static, str>,
+    done: usize,
+    start: Instant,
+}
+
+impl UnboundedModel {
+    /// Construct a model with a message describing the type of work being done.
+    pub fn new<S: Into<Cow<'static, str>>>(message: S) -> UnboundedModel {
+        UnboundedModel {
+            done: 0,
+            message: message.into(),
+            start: Instant::now(),
+        }
+    }
+
+    /// Update the amount of work done.
+    ///
+    /// This should normally be called from a callback passed to [View::update].
+    pub fn set_done(&mut self, done: usize) {
+        self.done = done
+    }
+
+    /// Update the amount of work done by an increment (typically 1).
+    ///
+    /// This should normally be called from a callback passed to [View::update].
+    ///
+    pub fn increment(&mut self, i: usize) {
+        self.done += i
+    }
+}
+
+impl Model for UnboundedModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!(
+            "{}: {} in {}",
+            self.message,
+            self.done,
+            format_duration(self.start.elapsed())
+        )
+    }
+}
+
+fn format_duration(d: Duration) -> String {
+    let elapsed_secs = d.as_secs();
+    if elapsed_secs >= 3600 {
+        format!(
+            "{}:{:02}:{:02}",
+            elapsed_secs / 3600,
+            (elapsed_secs / 60) % 60,
+            elapsed_secs % 60
+        )
+    } else {
+        format!("{}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
     }
 }

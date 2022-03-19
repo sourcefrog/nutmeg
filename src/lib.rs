@@ -114,8 +114,8 @@ Not released yet.
 * New: [percent_done] and [estimate_remaining] functions to help in rendering progress bars.
 
 * New: The [models] mod provides some generally-useful basic models,
-  specifically [models::StringPair] and [models::LinearModel]. These build only on the
-  public interface of Nutmeg, so also constitute examples of what can be done in
+  specifically [models::StringPair], [models::UnboundedModel] and [models::LinearModel].
+  These build only on the public interface of Nutmeg, so also constitute examples of what can be done in
   application-defined models.
 
 ## 0.0.2
