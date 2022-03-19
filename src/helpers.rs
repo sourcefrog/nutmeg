@@ -19,16 +19,16 @@ fn duration_brief(d: Duration) -> String {
 /// The result is in the format "33 sec" or "12 min". This format may change in
 /// future releases before 1.0.
 ///
-/// If the remaining time is not estimatable, returns None.
-pub fn estimate_remaining(start: &Instant, done: usize, total: usize) -> Option<String> {
+/// If the remaining time is not estimatable, returns "??".
+pub fn estimate_remaining(start: &Instant, done: usize, total: usize) -> String {
     let elapsed = start.elapsed();
     if total == 0 || done == 0 || elapsed.is_zero() || done > total {
-        None
+        "??".into()
     } else {
         let done = done as f64;
         let total = total as f64;
         let estimate = Duration::from_secs_f64(elapsed.as_secs_f64() * (total / done - 1.0));
-        Some(duration_brief(estimate))
+        duration_brief(estimate)
     }
 }
 
