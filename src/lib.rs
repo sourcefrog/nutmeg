@@ -123,6 +123,7 @@ Not released yet.
   application-defined models.
 
 * New: [View::finish] removes the progress bar (if painted) and returns the [Model].
+  [View::abandon] now also returns the model.
 
 ## 0.0.2
 
@@ -339,16 +340,17 @@ impl<M: Model> View<M> {
     ///
     /// If the progress bar is currently visible, it will be left behind on the
     /// screen.
-    pub fn abandon(self) {
+    ///
+    /// Returns the model.
+    pub fn abandon(self) -> M {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
         self.inner
             .lock()
-            .as_mut()
+            .take()
             .expect("inner state is still present")
             .abandon()
-            .unwrap();
-        // Nothing to do; consuming it is enough?
+            .unwrap()
     }
 
     /// Erase the model from the screen (if drawn), destroy it, and return the model.
@@ -554,6 +556,17 @@ impl<M: Model> InnerView<M> {
         self.model
     }
 
+    fn abandon(mut self) -> io::Result<M> {
+        match self.state {
+            State::ProgressDrawn { .. } => {
+                self.out.write_str("\n");
+            }
+            State::IncompleteLine | State::None | State::Printed { .. } => (),
+        }
+        self.state = State::None; // so that drop does not attempt to erase
+        Ok(self.model)
+    }
+
     /// Return the real or fake clock.
     fn clock(&self) -> Instant {
         if self.options.fake_clock {
@@ -655,17 +668,6 @@ impl<M: Model> InnerView<M> {
         self.out.write_bytes(buf);
         self.out.flush();
         Ok(buf.len())
-    }
-
-    fn abandon(&mut self) -> io::Result<()> {
-        match self.state {
-            State::ProgressDrawn { .. } => {
-                self.out.write_str("\n");
-            }
-            State::IncompleteLine | State::None | State::Printed { .. } => (),
-        }
-        self.state = State::None; // so that drop does not attempt to erase
-        Ok(())
     }
 
     /// Set the value of the fake clock, for testing.
