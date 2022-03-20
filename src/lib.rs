@@ -125,6 +125,9 @@ Not released yet.
 * New: [View::finish] removes the progress bar (if painted) and returns the [Model].
   [View::abandon] now also returns the model.
 
+* New: [Model::final_message] to let the model render a message to be printed when work
+  is complete.
+
 ## 0.0.2
 
 Released 2022-03-07
@@ -167,7 +170,6 @@ Released 2022-03-07
 
 use std::fmt::Display;
 use std::io::{self, Write};
-use std::ops::DerefMut;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
@@ -207,6 +209,24 @@ pub trait Model {
     /// }
     /// ```
     fn render(&mut self, width: usize) -> String;
+
+    /// Optionally render a final message when the view is finished.
+    ///
+    /// For example this could be used to print the amount of work done
+    /// after the work is complete.
+    ///
+    /// By default this prints nothing.
+    ///
+    /// The final message may contain ANSI styling and may be multiple lines,
+    /// but it should not have a final newline, unless a trailing blank line
+    /// is desired.
+    ///
+    /// This is called by [View::finish] or when the view is dropped.
+    /// The final message is not printed when the view is abandoned by
+    /// [View::abandon].
+    fn final_message(&mut self) -> Option<String> {
+        None
+    }
 }
 
 /// Blanket implementation of Model for Display.
@@ -485,8 +505,8 @@ impl<M: Model> Drop for View<M> {
         // if it's poisoned. And, do nothing if the View has already been
         // finished, in which case the contents of the Mutex will be None.
         if let Some(mut inner_guard) = self.inner.try_lock() {
-            if let Some(inner) = inner_guard.deref_mut() {
-                let _ = inner.hide();
+            if let Some(inner) = Option::take(&mut inner_guard) {
+                inner.finish();
             }
         }
     }
@@ -553,6 +573,9 @@ impl<M: Model> InnerView<M> {
 
     fn finish(mut self) -> M {
         let _ = self.hide();
+        if let Some(final_message) = self.model.final_message() {
+            self.out.write_str(&format!("{}\n", final_message));
+        }
         self.model
     }
 
