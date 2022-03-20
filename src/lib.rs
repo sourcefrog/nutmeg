@@ -91,6 +91,14 @@ fn main() -> std::io::Result<()> {
 
 See the `examples/` directory for more.
 
+# Other features
+
+The [models] module provides some predefined models, for example counting `i` of `n` items
+of work complete with an extrapolated ETA.
+
+Models can optionally provide a "final message" by implementing [View::final_message], which
+will be left on the screen when the view is finished.
+
 # Potential future features
 
 * Draw updates from a background thread, so that it will keep ticking even
