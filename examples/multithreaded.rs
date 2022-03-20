@@ -9,7 +9,6 @@
 //! subject to the update rate limit.
 
 use std::fmt::Write;
-use std::io;
 use std::sync::Arc;
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -43,7 +42,7 @@ impl nutmeg::Model for Model {
     }
 }
 
-fn work<T: io::Write>(i_thread: usize, arc_view: Arc<nutmeg::View<Model, T>>) {
+fn work(i_thread: usize, arc_view: Arc<nutmeg::View<Model>>) {
     let mut rng = rand::thread_rng();
     for j in 0..=THREAD_WORK_MAX {
         arc_view.update(|model| model.job_state[i_thread].x = j);

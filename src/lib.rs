@@ -111,6 +111,10 @@ See the `examples/` directory for more.
 
 Not released yet.
 
+* API change: The "Write" type representing the destination is no longer
+  part of the visible public signature of [View], to hide complexity and
+  since it is not helpful to most callers.
+
 * New: [percent_done] and [estimate_remaining] functions to help in rendering progress bars.
 
 * New: The [models] mod provides some generally-useful basic models,
@@ -246,15 +250,11 @@ where
 /// It is OK to print incomplete lines, i.e. without a final `\n`
 /// character. In this case the progress bar remains suspended
 /// until the line is completed.
-pub struct View<M: Model, Out: Write> {
-    inner: Mutex<InnerView<M, Out>>,
+pub struct View<M: Model> {
+    inner: Mutex<InnerView<M>>,
 }
 
-impl<M, Out> View<M, Out>
-where
-    M: Model,
-    Out: Write,
-{
+impl<M: Model> View<M> {
     /// Stop using this progress view.
     ///
     /// If the progress bar is currently visible, it will be left behind on the
@@ -360,9 +360,7 @@ where
             .write(message.as_bytes())
             .expect("writing message");
     }
-}
 
-impl<M: Model> View<M, WriteToPrint> {
     /// Construct a new progress view, drawn to stdout.
     ///
     /// `model` is the application-defined initial model. The View takes
@@ -378,42 +376,38 @@ impl<M: Model> View<M, WriteToPrint> {
     /// This constructor arranges that output from the progress view will be
     /// captured by the Rust test framework and not leak to stdout, but
     /// detection of whether to show progress bars may not work correctly.
-    pub fn new(model: M, mut options: Options) -> View<M, WriteToPrint> {
+    pub fn new(model: M, mut options: Options) -> View<M> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                WriteToPrint {},
+                Box::new(WriteToPrint {}),
                 options,
                 WidthStrategy::Stdout,
             )),
         }
     }
-}
 
-impl<M: Model> View<M, WriteToStderr> {
     /// Construct a new progress view, drawn to stderr.
     ///
     /// This is the same as [View::new] except that the progress bar, and
     /// any messages emitted through it, are sent to stderr.
-    pub fn to_stderr(model: M, mut options: Options) -> View<M, WriteToStderr> {
+    pub fn to_stderr(model: M, mut options: Options) -> View<M> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                WriteToStderr {},
+                Box::new(WriteToStderr {}),
                 options,
                 WidthStrategy::Stderr,
             )),
         }
     }
-}
 
-impl<M: Model, W: Write> View<M, W> {
     /// Construct a new progress view writing to an arbitrary
     /// [std::io::Write] stream.
     ///
@@ -426,11 +420,16 @@ impl<M: Model, W: Write> View<M, W> {
     ///
     /// Views constructed by this model use a fixed terminal width, rather
     /// than trying to dynamically measure the terminal width.
-    pub fn write_to(model: M, options: Options, out: W, width: usize) -> View<M, W> {
+    pub fn write_to<W: Write + Send + 'static>(
+        model: M,
+        options: Options,
+        out: W,
+        width: usize,
+    ) -> View<M> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                out,
+                Box::new(out),
                 options,
                 WidthStrategy::Fixed(width),
             )),
@@ -438,7 +437,7 @@ impl<M: Model, W: Write> View<M, W> {
     }
 }
 
-impl<M: Model, Out: Write> io::Write for View<M, Out> {
+impl<M: Model> io::Write for View<M> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
@@ -451,7 +450,7 @@ impl<M: Model, Out: Write> io::Write for View<M, Out> {
     }
 }
 
-impl<M: Model, Out: Write> Drop for View<M, Out> {
+impl<M: Model> Drop for View<M> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned
@@ -462,12 +461,12 @@ impl<M: Model, Out: Write> Drop for View<M, Out> {
 }
 
 /// The real contents of a View, inside a mutex.
-struct InnerView<M: Model, Out: Write> {
+struct InnerView<M: Model> {
     /// Current application model.
     model: M,
 
     /// Stream to write to the terminal.
-    out: Out,
+    out: Box<dyn Write + Send>,
 
     /// True if the progress bar is suspended, and should not be drawn.
     suspended: bool,
@@ -502,13 +501,13 @@ enum State {
     IncompleteLine,
 }
 
-impl<M: Model, Out: Write> InnerView<M, Out> {
+impl<M: Model> InnerView<M> {
     fn new(
         model: M,
-        out: Out,
+        out: Box<dyn Write + Send>,
         options: Options,
         width_strategy: WidthStrategy,
-    ) -> InnerView<M, Out> {
+    ) -> InnerView<M> {
         InnerView {
             out,
             model,
