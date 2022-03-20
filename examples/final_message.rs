@@ -12,8 +12,8 @@ impl nutmeg::Model for Model {
         format!("count: {}", self.i)
     }
 
-    fn final_message(&mut self) -> Option<String> {
-        Some(format!("done, {} steps executed", self.i))
+    fn final_message(&mut self) -> String {
+        format!("done, {} steps executed", self.i)
     }
 }
 

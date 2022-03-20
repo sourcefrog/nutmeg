@@ -224,8 +224,8 @@ pub trait Model {
     /// This is called by [View::finish] or when the view is dropped.
     /// The final message is not printed when the view is abandoned by
     /// [View::abandon].
-    fn final_message(&mut self) -> Option<String> {
-        None
+    fn final_message(&mut self) -> String {
+        String::new()
     }
 }
 
@@ -573,7 +573,8 @@ impl<M: Model> InnerView<M> {
 
     fn finish(mut self) -> M {
         let _ = self.hide();
-        if let Some(final_message) = self.model.final_message() {
+        let final_message = self.model.final_message();
+        if !final_message.is_empty() {
             self.out.write_str(&format!("{}\n", final_message));
         }
         self.model
