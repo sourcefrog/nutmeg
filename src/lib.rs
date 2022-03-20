@@ -122,6 +122,8 @@ Not released yet.
   These build only on the public interface of Nutmeg, so also constitute examples of what can be done in
   application-defined models.
 
+* New: [View::finish] removes the progress bar (if painted) and returns the [Model].
+
 ## 0.0.2
 
 Released 2022-03-07
@@ -164,6 +166,7 @@ Released 2022-03-07
 
 use std::fmt::Display;
 use std::io::{self, Write};
+use std::ops::DerefMut;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
@@ -249,10 +252,89 @@ where
 /// character. In this case the progress bar remains suspended
 /// until the line is completed.
 pub struct View<M: Model> {
-    inner: Mutex<InnerView<M>>,
+    /// The real state of the view.
+    ///
+    /// The contents are always Some unless the View has been explicitly destroyed,
+    /// in which case this makes Drop a no-op.
+    inner: Mutex<Option<InnerView<M>>>,
 }
 
 impl<M: Model> View<M> {
+    /// Construct a new progress view, drawn to stdout.
+    ///
+    /// `model` is the application-defined initial model. The View takes
+    /// ownership of the model, after which the application can update
+    /// it through [View::update].
+    ///
+    /// On Windows, this enables use of ANSI sequences for styling stdout.
+    ///
+    /// Even if progress bars are enabled in the [Options], they will be
+    /// disabled if stdout is not a tty, or if it does not support ANSI
+    /// sequences (on Windows).
+    ///
+    /// This constructor arranges that output from the progress view will be
+    /// captured by the Rust test framework and not leak to stdout, but
+    /// detection of whether to show progress bars may not work correctly.
+    pub fn new(model: M, mut options: Options) -> View<M> {
+        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
+            options.progress_enabled = false;
+        }
+        View {
+            inner: Mutex::new(Some(InnerView::new(
+                model,
+                WriteTo::Stdout,
+                options,
+                WidthStrategy::Stdout,
+            ))),
+        }
+    }
+
+    /// Construct a new progress view, drawn to stderr.
+    ///
+    /// This is the same as [View::new] except that the progress bar, and
+    /// any messages emitted through it, are sent to stderr.
+    pub fn to_stderr(model: M, mut options: Options) -> View<M> {
+        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
+            options.progress_enabled = false;
+        }
+        View {
+            inner: Mutex::new(Some(InnerView::new(
+                model,
+                WriteTo::Stderr,
+                options,
+                WidthStrategy::Stderr,
+            ))),
+        }
+    }
+
+    /// Construct a new progress view writing to an arbitrary
+    /// [std::io::Write] stream.
+    ///
+    /// This is probably mostly useful for testing: most applications
+    /// will want [View::new].
+    ///
+    /// This function assumes the stream is a tty and capable of drawing
+    /// progress bars through ANSI sequences, and does not try to
+    /// detect whether this is true, as [View::new] does.
+    ///
+    /// Views constructed by this model use a fixed terminal width, rather
+    /// than trying to dynamically measure the terminal width.
+    pub fn write_to<W: Write + Send + 'static>(
+        model: M,
+        options: Options,
+        out: W,
+        width: usize,
+    ) -> View<M> {
+        View {
+            inner: Mutex::new(Some(InnerView::new(
+                model,
+                WriteTo::Write(Box::new(out)),
+                options,
+                WidthStrategy::Fixed(width),
+            ))),
+        }
+    }
+
     /// Stop using this progress view.
     ///
     /// If the progress bar is currently visible, it will be left behind on the
@@ -260,8 +342,22 @@ impl<M: Model> View<M> {
     pub fn abandon(self) {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
-        self.inner.lock().abandon().unwrap();
+        self.inner
+            .lock()
+            .as_mut()
+            .expect("inner state is still present")
+            .abandon()
+            .unwrap();
         // Nothing to do; consuming it is enough?
+    }
+
+    /// Erase the model from the screen (if drawn), destroy it, and return the model.
+    pub fn finish(self) -> M {
+        self.inner
+            .lock()
+            .take()
+            .expect("inner state is still present")
+            .finish()
     }
 
     /// Update the model, and possibly redraw the screen to reflect the
@@ -285,6 +381,8 @@ impl<M: Model> View<M> {
     {
         self.inner
             .lock()
+            .as_mut()
+            .unwrap()
             .update(update_fn)
             .expect("progress update failed")
     }
@@ -292,13 +390,13 @@ impl<M: Model> View<M> {
     /// Hide the progress bar if it's currently drawn, and leave it
     /// hidden until [View::resume] is called.
     pub fn suspend(&self) {
-        self.inner.lock().suspend().unwrap()
+        self.inner.lock().as_mut().unwrap().suspend().unwrap()
     }
 
     /// Allow the progress bar to be drawn again, reversing the effect
     /// of [View::suspend].
     pub fn resume(&self) {
-        self.inner.lock().resume().unwrap()
+        self.inner.lock().as_mut().unwrap().resume().unwrap()
     }
 
     /// Set the value of the fake clock, for testing.
@@ -307,7 +405,11 @@ impl<M: Model> View<M> {
     ///
     /// Moving the clock backwards in time may cause a panic.
     pub fn set_fake_clock(&self, fake_clock: Instant) {
-        self.inner.lock().set_fake_clock(fake_clock)
+        self.inner
+            .lock()
+            .as_mut()
+            .unwrap()
+            .set_fake_clock(fake_clock)
     }
 
     /// Inspect the view's model.
@@ -324,7 +426,7 @@ impl<M: Model> View<M> {
     where
         F: FnOnce(&M) -> R,
     {
-        f(&self.inner.lock().model)
+        f(&self.inner.lock().as_mut().unwrap().model)
     }
 
     /// Print a message to the view.
@@ -355,83 +457,10 @@ impl<M: Model> View<M> {
     pub fn message(&self, message: &str) {
         self.inner
             .lock()
+            .as_mut()
+            .unwrap()
             .write(message.as_bytes())
             .expect("writing message");
-    }
-
-    /// Construct a new progress view, drawn to stdout.
-    ///
-    /// `model` is the application-defined initial model. The View takes
-    /// ownership of the model, after which the application can update
-    /// it through [View::update].
-    ///
-    /// On Windows, this enables use of ANSI sequences for styling stdout.
-    ///
-    /// Even if progress bars are enabled in the [Options], they will be
-    /// disabled if stdout is not a tty, or if it does not support ANSI
-    /// sequences (on Windows).
-    ///
-    /// This constructor arranges that output from the progress view will be
-    /// captured by the Rust test framework and not leak to stdout, but
-    /// detection of whether to show progress bars may not work correctly.
-    pub fn new(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
-            options.progress_enabled = false;
-        }
-        View {
-            inner: Mutex::new(InnerView::new(
-                model,
-                WriteTo::Stdout,
-                options,
-                WidthStrategy::Stdout,
-            )),
-        }
-    }
-
-    /// Construct a new progress view, drawn to stderr.
-    ///
-    /// This is the same as [View::new] except that the progress bar, and
-    /// any messages emitted through it, are sent to stderr.
-    pub fn to_stderr(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
-            options.progress_enabled = false;
-        }
-        View {
-            inner: Mutex::new(InnerView::new(
-                model,
-                WriteTo::Stderr,
-                options,
-                WidthStrategy::Stderr,
-            )),
-        }
-    }
-
-    /// Construct a new progress view writing to an arbitrary
-    /// [std::io::Write] stream.
-    ///
-    /// This is probably mostly useful for testing: most applications
-    /// will want [View::new].
-    ///
-    /// This function assumes the stream is a tty and capable of drawing
-    /// progress bars through ANSI sequences, and does not try to
-    /// detect whether this is true, as [View::new] does.
-    ///
-    /// Views constructed by this model use a fixed terminal width, rather
-    /// than trying to dynamically measure the terminal width.
-    pub fn write_to<W: Write + Send + 'static>(
-        model: M,
-        options: Options,
-        out: W,
-        width: usize,
-    ) -> View<M> {
-        View {
-            inner: Mutex::new(InnerView::new(
-                model,
-                WriteTo::Write(Box::new(out)),
-                options,
-                WidthStrategy::Fixed(width),
-            )),
-        }
     }
 }
 
@@ -440,7 +469,7 @@ impl<M: Model> io::Write for View<M> {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.inner.lock().write(buf)
+        self.inner.lock().as_mut().unwrap().write(buf)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -451,9 +480,12 @@ impl<M: Model> io::Write for View<M> {
 impl<M: Model> Drop for View<M> {
     fn drop(&mut self) {
         // Only try lock here: don't hang if it's locked or panic
-        // if it's poisoned
-        if let Some(mut inner) = self.inner.try_lock() {
-            let _ = inner.hide();
+        // if it's poisoned. And, do nothing if the View has already been
+        // finished, in which case the contents of the Mutex will be None.
+        if let Some(mut inner_guard) = self.inner.try_lock() {
+            if let Some(inner) = inner_guard.deref_mut() {
+                let _ = inner.hide();
+            }
         }
     }
 }
@@ -515,6 +547,11 @@ impl<M: Model> InnerView<M> {
             suspended: false,
             width_strategy,
         }
+    }
+
+    fn finish(mut self) -> M {
+        let _ = self.hide();
+        self.model
     }
 
     /// Return the real or fake clock.
