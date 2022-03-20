@@ -136,6 +136,9 @@ Not released yet.
 * New: [Model::final_message] to let the model render a message to be printed when work
   is complete.
 
+* New: The callback to [View::update] may return a value, and this is passed back to the caller
+  of [View::update].
+
 ## 0.0.2
 
 Released 2022-03-07
@@ -405,16 +408,14 @@ impl<M: Model> View<M> {
     ///   [Options::print_holdoff].
     /// * An incomplete message line isn't pending: in other words the
     ///   last message written to the view, if any, had a final newline.
-    pub fn update<U>(&self, update_fn: U)
+    ///
+    /// The `update_fn` may return a value, and this is returned from
+    /// `update`.
+    pub fn update<U, R>(&self, update_fn: U) -> R
     where
-        U: FnOnce(&mut M),
+        U: FnOnce(&mut M) -> R,
     {
-        self.inner
-            .lock()
-            .as_mut()
-            .unwrap()
-            .update(update_fn)
-            .expect("progress update failed")
+        self.inner.lock().as_mut().unwrap().update(update_fn)
     }
 
     /// Hide the progress bar if it's currently drawn, and leave it
@@ -677,12 +678,13 @@ impl<M: Model> InnerView<M> {
         Ok(())
     }
 
-    fn update<U>(&mut self, update_fn: U) -> io::Result<()>
+    fn update<U, R>(&mut self, update_fn: U) -> R
     where
-        U: FnOnce(&mut M),
+        U: FnOnce(&mut M) -> R,
     {
-        update_fn(&mut self.model);
-        self.paint_progress()
+        let r = update_fn(&mut self.model);
+        self.paint_progress().unwrap();
+        r
     }
 
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
