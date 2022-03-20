@@ -171,12 +171,10 @@ use parking_lot::Mutex;
 mod ansi;
 mod helpers;
 pub mod models;
-mod to_print;
 mod width;
 #[cfg(windows)]
 mod windows;
 
-use crate::to_print::{WriteToPrint, WriteToStderr};
 use crate::width::WidthStrategy;
 
 pub use crate::helpers::*;
@@ -383,7 +381,7 @@ impl<M: Model> View<M> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                Box::new(WriteToPrint {}),
+                WriteTo::Stdout,
                 options,
                 WidthStrategy::Stdout,
             )),
@@ -401,7 +399,7 @@ impl<M: Model> View<M> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                Box::new(WriteToStderr {}),
+                WriteTo::Stderr,
                 options,
                 WidthStrategy::Stderr,
             )),
@@ -429,7 +427,7 @@ impl<M: Model> View<M> {
         View {
             inner: Mutex::new(InnerView::new(
                 model,
-                Box::new(out),
+                WriteTo::Write(Box::new(out)),
                 options,
                 WidthStrategy::Fixed(width),
             )),
@@ -465,8 +463,8 @@ struct InnerView<M: Model> {
     /// Current application model.
     model: M,
 
-    /// Stream to write to the terminal.
-    out: Box<dyn Write + Send>,
+    /// Where and how to write bars and messages.
+    out: WriteTo,
 
     /// True if the progress bar is suspended, and should not be drawn.
     suspended: bool,
@@ -504,18 +502,18 @@ enum State {
 impl<M: Model> InnerView<M> {
     fn new(
         model: M,
-        out: Box<dyn Write + Send>,
+        write_to: WriteTo,
         options: Options,
         width_strategy: WidthStrategy,
     ) -> InnerView<M> {
         InnerView {
-            out,
+            fake_clock: Instant::now(),
             model,
             options,
-            width_strategy,
+            out: write_to,
             state: State::None,
             suspended: false,
-            fake_clock: Instant::now(),
+            width_strategy,
         }
     }
 
@@ -550,17 +548,15 @@ impl<M: Model> InnerView<M> {
         if let Some(width) = self.width_strategy.width() {
             let rendered = self.model.render(width);
             let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+            let mut buf = String::new();
             if let State::ProgressDrawn { cursor_y, .. } = self.state {
-                write!(self.out, "{}", ansi::up_n_lines_and_home(cursor_y))?;
+                buf.push_str(&ansi::up_n_lines_and_home(cursor_y));
             }
-            write!(
-                self.out,
-                "{}{}{}",
-                ansi::DISABLE_LINE_WRAP,
-                ansi::CLEAR_TO_END_OF_SCREEN,
-                rendered,
-            )?;
-            self.out.flush()?;
+            buf.push_str(ansi::DISABLE_LINE_WRAP);
+            buf.push_str(ansi::CLEAR_TO_END_OF_SCREEN);
+            buf.push_str(rendered);
+            self.out.write_str(&buf);
+            self.out.flush();
             self.state = State::ProgressDrawn {
                 since: now,
                 cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
@@ -585,15 +581,13 @@ impl<M: Model> InnerView<M> {
     fn hide(&mut self) -> io::Result<()> {
         match self.state {
             State::ProgressDrawn { cursor_y, .. } => {
-                write!(
-                    self.out,
+                self.out.write_str(&format!(
                     "{}{}{}",
                     ansi::up_n_lines_and_home(cursor_y),
                     ansi::CLEAR_TO_END_OF_SCREEN,
                     ansi::ENABLE_LINE_WRAP,
-                )
-                .unwrap();
-                self.out.flush()?;
+                ));
+                self.out.flush();
                 self.state = State::None;
             }
             State::None | State::IncompleteLine | State::Printed { .. } => {}
@@ -621,15 +615,15 @@ impl<M: Model> InnerView<M> {
         } else {
             State::IncompleteLine
         };
-        self.out.write_all(buf)?;
-        self.out.flush()?;
+        self.out.write_bytes(buf);
+        self.out.flush();
         Ok(buf.len())
     }
 
     fn abandon(&mut self) -> io::Result<()> {
         match self.state {
             State::ProgressDrawn { .. } => {
-                self.out.write_all(b"\n")?;
+                self.out.write_str("\n");
             }
             State::IncompleteLine | State::None | State::Printed { .. } => (),
         }
@@ -732,6 +726,38 @@ impl Default for Options {
             print_holdoff: Duration::from_millis(100),
             progress_enabled: true,
             fake_clock: false,
+        }
+    }
+}
+
+/// Destinations for progress bar output.
+enum WriteTo {
+    Stdout,
+    Stderr,
+    Write(Box<dyn Write + Send + 'static>),
+}
+
+impl WriteTo {
+    fn write_str(&mut self, buf: &str) {
+        match self {
+            WriteTo::Stdout => print!("{}", buf),
+            WriteTo::Stderr => eprint!("{}", buf),
+            WriteTo::Write(w) => write!(w, "{}", buf).unwrap(),
+        }
+    }
+
+    fn write_bytes(&mut self, buf: &[u8]) {
+        match self {
+            WriteTo::Stdout | WriteTo::Stderr => self.write_str(&String::from_utf8_lossy(buf)),
+            WriteTo::Write(w) => w.write_all(buf).unwrap(),
+        }
+    }
+
+    fn flush(&mut self) {
+        match self {
+            WriteTo::Stdout => io::stdout().flush().unwrap(),
+            WriteTo::Stderr => io::stderr().flush().unwrap(),
+            WriteTo::Write(w) => w.flush().unwrap(),
         }
     }
 }
