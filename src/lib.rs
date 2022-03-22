@@ -96,7 +96,7 @@ See the `examples/` directory for more.
 The [models] module provides some predefined models, for example counting `i` of `n` items
 of work complete with an extrapolated ETA.
 
-Models can optionally provide a "final message" by implementing [View::final_message], which
+Models can optionally provide a "final message" by implementing [Model::final_message], which
 will be left on the screen when the view is finished.
 
 # Potential future features
@@ -138,6 +138,10 @@ Not released yet.
 
 * New: The callback to [View::update] may return a value, and this is passed back to the caller
   of [View::update].
+
+* New: [models::BasicModel] allows simple cases to supply both an intital value
+  and a render function inline in the [View] constructor call, avoiding any
+  need to define a [Model] struct.
 
 ## 0.0.2
 

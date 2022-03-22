@@ -208,3 +208,62 @@ fn format_duration(d: Duration) -> String {
         format!("{}:{:02}", (elapsed_secs / 60) % 60, elapsed_secs % 60)
     }
 }
+
+/// A model that stores any user-provided type, and renders by calling a function
+/// provided in the constructor.
+///
+/// For many simple cases this avoids any need to explicitly declare a model
+/// class: instead the [View::new] call can, in-line, construct a BasicView
+/// giving an initial value and a render function.
+///
+/// # Example
+/// ```
+/// let view = nutmeg::View::new(
+///     nutmeg::models::BasicModel::new((0, 10), |(a, b)| format!("{}/{} complete", a, b)),
+///     nutmeg::Options::default(),
+/// );
+/// for _i in 0..10 {
+///     view.update(|model| model.value.0 += 1);
+///     // ...
+/// }
+/// ```
+pub struct BasicModel<T, R>
+where
+    R: FnMut(&mut T) -> String,
+{
+    /// The current inner value of the model.
+    ///
+    /// The type `T` and initial value are set by the first parameter to
+    /// [BasicModel::new].
+    ///
+    /// The functions passed to [View::update] take a `model` as a parameter
+    /// and should typically act on `model.value`.
+    pub value: T,
+    render_fn: R,
+}
+
+impl<T, R> BasicModel<T, R>
+where
+    R: FnMut(&mut T) -> String,
+{
+    /// Construct a new BasicModel.
+    ///
+    /// `value` is the initial inner value of the model. It may be any type
+    /// but might typically be an integer, a string, or a tuple of simple
+    /// values.
+    ///
+    /// `render_fn` takes an `&mut T` and renders it to a string to be
+    /// drawn in the progress bar.
+    pub fn new(value: T, render_fn: R) -> BasicModel<T, R> {
+        BasicModel { value, render_fn }
+    }
+}
+
+impl<T, R> Model for BasicModel<T, R>
+where
+    R: FnMut(&mut T) -> String,
+{
+    fn render(&mut self, _width: usize) -> String {
+        (self.render_fn)(&mut self.value)
+    }
+}
