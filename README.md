@@ -1,6 +1,6 @@
 # nutmeg - an unopinionated progress bar library
 
-https://github.com/sourcefrog/cargo-mutants
+<https://github.com/sourcefrog/cargo-mutants>
 
 [![Tests](https://github.com/sourcefrog/nutmeg/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/sourcefrog/nutmeg/actions/workflows/tests.yml?query=branch%3Amain)
 [![docs.rs](https://docs.rs/nutmeg/badge.svg)](https://docs.rs/nutmeg)
@@ -8,7 +8,7 @@ https://github.com/sourcefrog/cargo-mutants
 [![libs.rs](https://img.shields.io/badge/libs.rs-nutmeg-blue)](https://lib.rs/crates/nutmeg)
 ![Maturity: Beta](https://img.shields.io/badge/maturity-beta-blue.svg)
 
-Nutmeg draws terminal progress indicators while giving the application complete 
+Nutmeg draws terminal progress indicators while giving the application complete
 control over their appearance and content.
 
 For more information: <https://docs.rs/nutmeg>
@@ -64,3 +64,17 @@ fn main() -> std::io::Result<()> {
 ```
 
 [![asciicast](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw.svg)](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw)
+
+## Project status
+
+This is a young library. The API will not break gratuitously, but it may change
+as we learn how to better express application needs.
+
+Changes are described in the changelog in the top-level Rustdoc (in
+`src/lib.rs`).
+
+Constructive feedback on integrations that work well, or that don't work well,
+is welcome.
+
+When the API has settled this will be promoted to 1.0 and then we'll avoid API
+breakage.
