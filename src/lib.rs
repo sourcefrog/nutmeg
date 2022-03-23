@@ -368,14 +368,12 @@ impl<M: Model> View<M> {
         if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        View {
-            inner: Mutex::new(Some(InnerView::new(
-                model,
-                WriteTo::Stdout,
-                options,
-                WidthStrategy::Stdout,
-            ))),
-        }
+        View::from_inner(InnerView::new(
+            model,
+            WriteTo::Stdout,
+            options,
+            WidthStrategy::Stdout,
+        ))
     }
 
     /// Construct a new progress view, drawn to stderr.
@@ -386,14 +384,12 @@ impl<M: Model> View<M> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }
-        View {
-            inner: Mutex::new(Some(InnerView::new(
-                model,
-                WriteTo::Stderr,
-                options,
-                WidthStrategy::Stderr,
-            ))),
-        }
+        View::from_inner(InnerView::new(
+            model,
+            WriteTo::Stderr,
+            options,
+            WidthStrategy::Stderr,
+        ))
     }
 
     /// Construct a new progress view writing to an arbitrary
@@ -414,13 +410,18 @@ impl<M: Model> View<M> {
         out: W,
         width: usize,
     ) -> View<M> {
+        View::from_inner(InnerView::new(
+            model,
+            WriteTo::Write(Box::new(out)),
+            options,
+            WidthStrategy::Fixed(width),
+        ))
+    }
+
+    /// Private constructor from an InnerView.
+    fn from_inner(inner_view: InnerView<M>) -> View<M> {
         View {
-            inner: Mutex::new(Some(InnerView::new(
-                model,
-                WriteTo::Write(Box::new(out)),
-                options,
-                WidthStrategy::Fixed(width),
-            ))),
+            inner: Mutex::new(Some(inner_view)),
         }
     }
 
@@ -770,7 +771,7 @@ impl<M: Model> InnerView<M> {
 
 /// Options controlling a View.
 ///
-/// These are supplied to a constructor like [View::new] and cannot be changed after the view is created.
+/// These are supplied to a constructor like [View::new], and cannot be changed after the view is created.
 ///
 /// The default options created by [Options::default] should be reasonable
 /// for most applications.
