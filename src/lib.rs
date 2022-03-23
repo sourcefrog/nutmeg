@@ -22,6 +22,9 @@ The application is responsible for:
 5. Printing text output only via the [View] while it is in use, to avoid the
    display getting scrambled.
 
+Some applications might find the provided [models] suit their needs, in which case they
+can skip steps 1 and 2.
+
 The application can control colors and styling by including ANSI
 escape sequences in the rendered string, for example by using the
 `yansi` crate.
@@ -98,6 +101,9 @@ of work complete with an extrapolated ETA.
 
 Models can optionally provide a "final message" by implementing [Model::final_message], which
 will be left on the screen when the view is finished.
+
+This crate also provides a few free functions such as [estimate_remaining],
+that can be helpful in rendering progress bars.
 
 # Potential future features
 
