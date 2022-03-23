@@ -160,10 +160,6 @@ is welcome.
 * Also set the window title from the progress model, perhaps by a different
   render function?
 
-* Better detection of when to draw progress or not. Possibly look at
-  `TERM=dumb`; possibly hook in to a standard Rust mechanism e.g.
-  <https://github.com/rust-cli/team/issues/15#issuecomment-891350115>.
-
 # Changelog
 
 ## 0.0.3
@@ -197,6 +193,9 @@ Not released yet.
   need to define a [Model] struct.
 
 * New: [View::inspect_model] gives its callback a `&mut` to the model.
+
+* New: Progress bars constructed by [View::new] and [View::new_stderr] are disabled when
+  `$TERM=dumb`.
 
 ## 0.0.2
 
@@ -238,6 +237,7 @@ Released 2022-03-07
 
 #![warn(missing_docs)]
 
+use std::env;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
@@ -370,17 +370,21 @@ impl<M: Model> View<M> {
     /// ownership of the model, after which the application can update
     /// it through [View::update].
     ///
+    /// `options` can typically be `Options::default`.
+    ///
     /// On Windows, this enables use of ANSI sequences for styling stdout.
     ///
     /// Even if progress bars are enabled in the [Options], they will be
-    /// disabled if stdout is not a tty, or if it does not support ANSI
-    /// sequences (on Windows).
+    /// disabled under some conditions:
+    /// * If stdout is not a tty,
+    /// * On Windows, if ANSI sequences cannot be enabled.
+    /// * If the `$TERM` environment variable is `DUMB`.
     ///
     /// This constructor arranges that output from the progress view will be
     /// captured by the Rust test framework and not leak to stdout, but
     /// detection of whether to show progress bars may not work correctly.
     pub fn new(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() {
+        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() || is_dumb_term() {
             options.progress_enabled = false;
         }
         View::from_inner(InnerView::new(
@@ -396,7 +400,7 @@ impl<M: Model> View<M> {
     /// This is the same as [View::new] except that the progress bar, and
     /// any messages emitted through it, are sent to stderr.
     pub fn new_stderr(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
+        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() || is_dumb_term() {
             options.progress_enabled = false;
         }
         View::from_inner(InnerView::new(
@@ -599,6 +603,10 @@ impl<M: Model> Drop for View<M> {
             }
         }
     }
+}
+
+fn is_dumb_term() -> bool {
+    env::var("TERM").map_or(false, |s| s.eq_ignore_ascii_case("dumb"))
 }
 
 /// The real contents of a View, inside a mutex.
