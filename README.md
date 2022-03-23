@@ -64,17 +64,3 @@ fn main() -> std::io::Result<()> {
 ```
 
 [![asciicast](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw.svg)](https://asciinema.org/a/oPI37ohOY8yhDxomTzHCsR4sw)
-
-## Project status
-
-This is a young library. The API will not break gratuitously, but it may change
-as we learn how to better express application needs.
-
-Changes are described in the changelog in the top-level Rustdoc (in
-`src/lib.rs`).
-
-Constructive feedback on integrations that work well, or that don't work well,
-is welcome.
-
-When the API has settled this will be promoted to 1.0 and then we'll avoid API
-breakage.

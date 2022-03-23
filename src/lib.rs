@@ -2,52 +2,75 @@
 
 /*!
 
-Nutmeg draws terminal progress bars whose appearance is completely controlled
-by the application.
+Nutmeg draws multi-line terminal progress bars to an ANSI terminal.
+
+By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
+concept of what the progress bar or indicator should look like: the application
+has complete control.
 
 # Concept
 
-By contrast to other Rust progress-bar libraries, Nutmeg has no built-in
-concept of what the progress bar or indicator should look like: this is
-entirely under the control of the application.
+Nutmeg has three key types: Model, View, and Options.
 
-The application is responsible for:
+## Model
 
-1. Defining a "model" type that holds whatever information is relevant to drawing
-   progress bars: the time elapsed, number of things processed, currently active tasks,
-   total expected work, whatever...
-2. Implementing the [Model] trait for your model. This has only one mandatory method,
-   [Model::render], which renders the model into styled text.
-3. Constructing a [View] to draw a progress bar.
-4. Updating the model when appropriate by calling [View::update], passing a callback
-   that mutates the state.
-5. Printing any messages while the [View] is in use
-   via `writeln!(view, ...)` or [View::message].
+A type implementing the [Model] trait holds whatever information is needed to draw the
+progress bars. This might be the start time of the operation, the number of things
+processed, the amount of data transmitted or received, the currently active tasks, whatever...
 
-Some applications might find the provided [models] suit their needs, in which case they
-can skip steps 1 and 2.
+The Model can be any of these things, from simplest to most powerful:
 
-The application can control colors and styling by including ANSI
-escape sequences in the rendered string, for example by using the
-`yansi` crate.
+1. Any type that implements [std::fmt::Display], such as a String or integer.
+2. One of the provided [models].
+3. An application-defined struct (or enum or other type) that implements [Model].
+
+The model is responsible for rendering itself into a String, optionally with ANSI styling,
+by implementing [Model::render] (or [std::fmt::Display]).  Applications might
+choose to use any of the Rust crates that can render ANSI control codes into a
+string, such as yansi.
 
 The application is responsible for deciding whether or not to
-color its output, for example by consulting `$CLICOLORS`.
+color its output, for example by consulting `$CLICOLORS` or its own command line.
 
-The Nutmeg library is responsible for:
+Models can optionally provide a "final message" by implementing
+[Model::final_message], which will be left on the screen when the view is finished.
 
-* Periodically drawing the progress bar in response to updates, including
-  horizontally truncating output to fit on the screen.
-* Removing the progress bar when the view is finished or dropped.
-* Coordinating to hide the bar to print text output, and restore it
-  afterwards.
-* Limiting the rate at which updates are drawn to the screen.
-* Disabling progress bars if stdout is not a terminal.
+If one overall operation represents several concurrent operations then the
+application can, for example, represent them in a collection within the Model, and
+render them into multiple lines, or multiple sections in a single line.
+(See `examples/multithreaded.rs`.)
+
+## View
+
+To get the model on to the terminal the application must create a [View], typically
+with [View::new], passing the initial model. The view takes ownership of the model.
+
+The application then updates the model state via [View::update], which may decide
+to paint the view to the terminal, subject to rate-limiting and other constraints.
+
+The view has an internal mutex and is `Send` and `Sync`,
+so it can be shared freely across threads.
+
+The view automatically erases itself from the screen when it is dropped.
+
+While the view is on the screen, the application can print messages interleaved
+with the progress bar by either calling [View::message], or treating it as a [std::io::Write]
+destination, for example for [std::writeln].
 
 Errors in writing to the terminal cause a panic.
 
-Nutmeg only supports ANSI terminals, which are supported on all Unix
-and Windows 10 and later.
+## Options
+
+A small [Options] type, passed to the View constructor, allows turning progress bars
+off, setting rate limits, etc.
+
+In particular applications might choose to construct all [Options] from a single function
+that respects an application-level option for whether progress bars should be drawn.
+
+## Utility functions
+
+This crate also provides a few free functions such as [estimate_remaining],
+that can be helpful in implementing [Model::render].
 
 # Example
 
@@ -96,16 +119,36 @@ fn main() -> std::io::Result<()> {
 
 See the `examples/` directory for more.
 
-# Other features
+# Performance
 
-The [models] module provides some predefined models, for example counting `i` of `n` items
-of work complete with an extrapolated ETA.
+Nutmeg's goal is that [View::update] is cheap enough that applications can call it
+fairly freely when there are small updates. The library takes care of rate-limiting
+updates to the terminal, as configured in the [Options].
 
-Models can optionally provide a "final message" by implementing [Model::final_message], which
-will be left on the screen when the view is finished.
+Each call to [View::update] will take a `parking_lot` mutex and check the
+system time, in addition to running the callback and some function-call overhead.
 
-This crate also provides a few free functions such as [estimate_remaining],
-that can be helpful in rendering progress bars.
+The model is only rendered to a string, and the string printed to a terminal, if
+sufficient time has passed since it was last painted.
+
+The `examples/bench.rs` sends updates as fast as possible to a model containing a
+single `u64`, from a single thread. As of 2022-03-22, on a 2019 Core i9 Macbook Pro,
+it takes about 500ms to send 10e6 updates, or 50ns/update.
+
+# Project status
+
+Nutmeg is a young library. Although the API will not break gratuitously,
+it may evolve in response to experience and feedback in every pre-1.0 release.
+
+If the core ideas prove useful and the API remains stable for an extended period
+then the author intends to promote it to 1.0, after which the API will respect
+Rust stability conventions.
+
+Changes are described in the [changelog](#Changelog) in the top-level Rustdoc,
+below.
+
+Constructive feedback on integrations that work well, or that don't work well,
+is welcome.
 
 # Potential future features
 
