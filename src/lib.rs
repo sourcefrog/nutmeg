@@ -260,14 +260,27 @@ pub use crate::helpers::*;
 pub trait Model {
     /// Render this model into a string to draw on the console.
     ///
-    /// Each line should be no more than `width` columns as displayed.
-    /// If they are longer, they will be truncated.
+    /// This is called by the View when it wants to repaint the screen
+    /// after [View::update] was called.
+    ///
+    /// Future versions of this library may call this function from a different
+    /// thread.
+    ///
+    /// The `width` argument advises the model rendering code of the width of
+    /// the terminal. The `render` implementation may make us of this to, for
+    /// example, draw a full-width progress bar, or to selectively truncate
+    /// sections within the line.
+    ///
+    /// The model may also ignore the `width` parameter and return a string
+    /// of any width, in which case it will be truncated to fit on the
+    /// screen.
     ///
     /// The rendered version may contain ANSI escape sequences for coloring,
     /// etc, but should not move the cursor.
     ///
-    /// Lines are separarated by `\n` and there may optionally be a final
-    /// newline.
+    /// Lines are separarated by `\n`. If there is a final `\n` it is ignored.
+    ///
+    /// # Example
     ///
     /// ```
     /// struct Model { i: usize, total: usize }
@@ -468,6 +481,10 @@ impl<M: Model> View<M> {
     ///   [Options::print_holdoff].
     /// * An incomplete message line isn't pending: in other words the
     ///   last message written to the view, if any, had a final newline.
+    ///
+    /// If the view decides to repaint the progress bar it will call
+    /// [Model::render]. In a future release redrawing may be done on a
+    /// different thread.
     ///
     /// The `update_fn` may return a value, and this is returned from
     /// `update`.
