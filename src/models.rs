@@ -215,6 +215,7 @@ fn format_duration(d: Duration) -> String {
 /// For many simple cases this avoids any need to explicitly declare a model
 /// class: instead the [View::new] call can, in-line, construct a BasicView
 /// giving an initial value and a render function.
+
 ///
 /// # Example
 /// ```
@@ -223,6 +224,8 @@ fn format_duration(d: Duration) -> String {
 ///     nutmeg::Options::default(),
 /// );
 /// for _i in 0..10 {
+///     // Note that the callback should update `model.value`, which is the user-defined
+///     // type.
 ///     view.update(|model| model.value.0 += 1);
 ///     // ...
 /// }

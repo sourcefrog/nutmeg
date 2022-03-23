@@ -13,14 +13,16 @@ entirely under the control of the application.
 
 The application is responsible for:
 
-1. Defining a type holds whatever information is relevant to drawing
-   progress bars.
-2. Rendering that information into styled text lines, by implementing the
-   single-method trait [Model::render].
+1. Defining a "model" type that holds whatever information is relevant to drawing
+   progress bars: the time elapsed, number of things processed, currently active tasks,
+   total expected work, whatever...
+2. Implementing the [Model] trait for your model. This has only one mandatory method,
+   [Model::render], which renders the model into styled text.
 3. Constructing a [View] to draw a progress bar.
-4. Updating the model when appropriate by calling [View::update].
-5. Printing text output only via the [View] while it is in use, to avoid the
-   display getting scrambled.
+4. Updating the model when appropriate by calling [View::update], passing a callback
+   that mutates the state.
+5. Printing any messages while the [View] is in use
+   via `writeln!(view, ...)` or [View::message].
 
 Some applications might find the provided [models] suit their needs, in which case they
 can skip steps 1 and 2.
