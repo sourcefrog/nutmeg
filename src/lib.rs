@@ -174,6 +174,8 @@ Not released yet.
   part of the visible public signature of [View], to hide complexity and
   since it is not helpful to most callers.
 
+* API change: Renamed `View::to_stderr` to [View::new_stderr].
+
 * New: [percent_done] and [estimate_remaining] functions to help in rendering progress bars.
 
 * New: The [models] mod provides some generally-useful basic models,
@@ -204,7 +206,7 @@ Released 2022-03-07
 
 * Fixed: A bug that caused leftover text when multi-line bars shrink in width.
 
-* Fixed: The output from bars created with [View::new] and [View::to_stderr] in
+* Fixed: The output from bars created with [View::new] and `View::to_stderr` in
   Rust tests is captured with the test output rather than leaking through
   to cargo's output.
 
@@ -380,7 +382,7 @@ impl<M: Model> View<M> {
     ///
     /// This is the same as [View::new] except that the progress bar, and
     /// any messages emitted through it, are sent to stderr.
-    pub fn to_stderr(model: M, mut options: Options) -> View<M> {
+    pub fn new_stderr(model: M, mut options: Options) -> View<M> {
         if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() {
             options.progress_enabled = false;
         }

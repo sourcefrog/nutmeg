@@ -20,7 +20,7 @@ fn view_stdout_captured() {
 
 #[test]
 fn view_stderr_captured() {
-    let mut view = nutmeg::View::to_stderr(String::new(), nutmeg::Options::default());
+    let mut view = nutmeg::View::new_stderr(String::new(), nutmeg::Options::default());
     view.update(|model| *model = "stderr progress should be captured".into());
     writeln!(view, "stderr message should be captured").unwrap();
 }
