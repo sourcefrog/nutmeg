@@ -190,7 +190,7 @@ Not released yet.
 * New: The callback to [View::update] may return a value, and this is passed back to the caller
   of [View::update].
 
-* New: [models::BasicModel] allows simple cases to supply both an intital value
+* New: [models::BasicModel] allows simple cases to supply both an initial value
   and a render function inline in the [View] constructor call, avoiding any
   need to define a [Model] struct.
 
