@@ -162,9 +162,9 @@ is welcome.
 
 # Changelog
 
-## 0.0.3
+## 0.1.0
 
-Not released yet.
+Released 2022-03-22
 
 * API change: The "Write" type representing the destination is no longer
   part of the visible public signature of [View], to hide complexity and
