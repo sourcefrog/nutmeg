@@ -11,7 +11,7 @@ fn main() {
     for i in 0..n {
         view.update(|model| *model = i);
     }
-    view.message(&format!(
+    view.message(format!(
         "{}ms to send {} updates; average {}ns/update",
         start.elapsed().as_millis(),
         n,

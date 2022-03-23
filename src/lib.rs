@@ -162,6 +162,14 @@ is welcome.
 
 # Changelog
 
+## 0.1.1
+
+Released 2022-03-22
+
+* API change: [View::message] takes the message as an `AsRef<str>`, meaning
+  it may be either a `&str` or `String`. This makes the common case where
+  the message is the result of `format!` a little easier.
+
 ## 0.1.0
 
 Released 2022-03-22
@@ -567,14 +575,14 @@ impl<M: Model> View<M> {
     /// ```
     /// let view = nutmeg::View::new(0, nutmeg::Options::default());
     /// // ...
-    /// view.message(&format!("{} splines reticulated\n", 42));
+    /// view.message(format!("{} splines reticulated\n", 42));
     /// ```
-    pub fn message(&self, message: &str) {
+    pub fn message<S: AsRef<str>>(&self, message: S) {
         self.inner
             .lock()
             .as_mut()
             .unwrap()
-            .write(message.as_bytes())
+            .write(message.as_ref().as_bytes())
             .expect("writing message");
     }
 }
