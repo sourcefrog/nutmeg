@@ -194,6 +194,8 @@ Not released yet.
   and a render function inline in the [View] constructor call, avoiding any
   need to define a [Model] struct.
 
+* New: [View::inspect_model] gives its callback a `&mut` to the model.
+
 ## 0.0.2
 
 Released 2022-03-07
@@ -510,9 +512,9 @@ impl<M: Model> View<M> {
     /// ```
     pub fn inspect_model<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&M) -> R,
+        F: FnOnce(&mut M) -> R,
     {
-        f(&self.inner.lock().as_mut().unwrap().model)
+        f(&mut self.inner.lock().as_mut().unwrap().model)
     }
 
     /// Print a message to the view.
