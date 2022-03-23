@@ -529,7 +529,9 @@ impl<M: Model> View<M> {
     ///
     /// The message may contain multiple lines.
     ///
-    /// If the last character of the message is *not* '\n' then the incomplete
+    /// Typically the message should end with `\n`.
+    ///
+    /// If the last character of the message is *not* `\n` then the incomplete
     /// line remains on the terminal, and the progress bar will not be painted
     /// until it is completed by a message finishing in `\n`.
     ///
@@ -538,7 +540,8 @@ impl<M: Model> View<M> {
     ///   can be called on a `&View`.
     /// * `message` panics on an error writing to the terminal; `write!` requires
     ///   the caller to handle a `Result`.
-    /// * `write!` integrates string formatting; `message` does not.
+    /// * `write!` integrates string formatting; `message` does not, and typically
+    ///   would be called with the results of `format!()`.
     ///
     /// ```
     /// let view = nutmeg::View::new(0, nutmeg::Options::default());
