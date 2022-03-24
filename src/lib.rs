@@ -162,6 +162,19 @@ is welcome.
 
 # Changelog
 
+## 0.1.2
+
+Not released yet.
+
+* API change: Removed `View::new_stderr` and `View::write_to`. Instead, the view
+  can be drawn on stderr or output can be captured using [Options::destination].
+  This is better aligned with the idea that programs might have a central function
+  that constructs a [Options], as they will probably want to consistently
+  write to either stdout or stderr.
+
+* New: Output can be captured for inspection in tests using
+  [View::capture_output].
+
 ## 0.1.1
 
 Released 2022-03-22
@@ -178,7 +191,7 @@ Released 2022-03-22
   part of the visible public signature of [View], to hide complexity and
   since it is not helpful to most callers.
 
-* API change: Renamed `View::to_stderr` to [View::new_stderr].
+* API change: Renamed `View::to_stderr` to `View::new_stderr`.
 
 * New: [percent_done] and [estimate_remaining] functions to help in rendering progress bars.
 
@@ -202,7 +215,7 @@ Released 2022-03-22
 
 * New: [View::inspect_model] gives its callback a `&mut` to the model.
 
-* New: Progress bars constructed by [View::new] and [View::new_stderr] are disabled when
+* New: Progress bars constructed by [View::new] and `View::new_stderr` are disabled when
   `$TERM=dumb`.
 
 ## 0.0.2
@@ -248,6 +261,7 @@ Released 2022-03-07
 use std::env;
 use std::fmt::Display;
 use std::io::{self, Write};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
@@ -329,7 +343,9 @@ pub trait Model {
 /// for very basic progress indications.
 ///
 /// ```
-/// let view = nutmeg::View::new(0, nutmeg::Options::default());
+/// use nutmeg::{Options, View};
+///
+/// let view = View::new(0, Options::default());
 /// view.update(|model| *model += 1);
 /// ```
 impl<T> Model for T
@@ -392,57 +408,10 @@ impl<M: Model> View<M> {
     /// captured by the Rust test framework and not leak to stdout, but
     /// detection of whether to show progress bars may not work correctly.
     pub fn new(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stdout) || !ansi::enable_windows_ansi() || is_dumb_term() {
+        if !options.destination.is_possible() {
             options.progress_enabled = false;
         }
-        View::from_inner(InnerView::new(
-            model,
-            WriteTo::Stdout,
-            options,
-            WidthStrategy::Stdout,
-        ))
-    }
-
-    /// Construct a new progress view, drawn to stderr.
-    ///
-    /// This is the same as [View::new] except that the progress bar, and
-    /// any messages emitted through it, are sent to stderr.
-    pub fn new_stderr(model: M, mut options: Options) -> View<M> {
-        if atty::isnt(atty::Stream::Stderr) || !ansi::enable_windows_ansi() || is_dumb_term() {
-            options.progress_enabled = false;
-        }
-        View::from_inner(InnerView::new(
-            model,
-            WriteTo::Stderr,
-            options,
-            WidthStrategy::Stderr,
-        ))
-    }
-
-    /// Construct a new progress view writing to an arbitrary
-    /// [std::io::Write] stream.
-    ///
-    /// This is probably mostly useful for testing: most applications
-    /// will want [View::new].
-    ///
-    /// This function assumes the stream is a tty and capable of drawing
-    /// progress bars through ANSI sequences, and does not try to
-    /// detect whether this is true, as [View::new] does.
-    ///
-    /// Views constructed by this model use a fixed terminal width, rather
-    /// than trying to dynamically measure the terminal width.
-    pub fn write_to<W: Write + Send + 'static>(
-        model: M,
-        options: Options,
-        out: W,
-        width: usize,
-    ) -> View<M> {
-        View::from_inner(InnerView::new(
-            model,
-            WriteTo::Write(Box::new(out)),
-            options,
-            WidthStrategy::Fixed(width),
-        ))
+        View::from_inner(InnerView::new(model, options))
     }
 
     /// Private constructor from an InnerView.
@@ -538,7 +507,9 @@ impl<M: Model> View<M> {
     /// of `f` is returned by `inspect_model`.
     ///
     /// ```
-    /// let view = nutmeg::View::new(10, nutmeg::Options::default());
+    /// use nutmeg::{Options, View};
+    ///
+    /// let view = View::new(10, Options::default());
     /// view.update(|model| *model += 3);
     /// assert_eq!(view.inspect_model(|m| *m), 13);
     /// ```
@@ -573,7 +544,9 @@ impl<M: Model> View<M> {
     ///   would be called with the results of `format!()`.
     ///
     /// ```
-    /// let view = nutmeg::View::new(0, nutmeg::Options::default());
+    /// use nutmeg::{Options, View};
+    ///
+    /// let view = View::new(0, Options::default());
     /// // ...
     /// view.message(format!("{} splines reticulated\n", 42));
     /// ```
@@ -584,6 +557,29 @@ impl<M: Model> View<M> {
             .unwrap()
             .write(message.as_ref().as_bytes())
             .expect("writing message");
+    }
+
+    /// Configure the view to capture output to a string rather than writing to the
+    /// destination, and return a buffer from which the output can later
+    /// be inspected.
+    ///
+    /// The buffer is returned in an Arc so that it remains valid after the View
+    /// is dropped.
+    ///
+    /// This is intended for use in testing.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use nutmeg::{Options, View};
+    ///
+    /// let view = View::new(0, Options::default());
+    /// let output = view.capture_output();
+    /// view.message("Captured message\n");
+    /// assert_eq!(output.lock().as_str(), "Captured message\n");
+    /// ```
+    pub fn capture_output(&self) -> Arc<Mutex<String>> {
+        self.inner.lock().as_mut().unwrap().capture_output()
     }
 }
 
@@ -622,9 +618,6 @@ struct InnerView<M: Model> {
     /// Current application model.
     model: M,
 
-    /// Where and how to write bars and messages.
-    out: WriteTo,
-
     /// True if the progress bar is suspended, and should not be drawn.
     suspended: bool,
 
@@ -638,6 +631,9 @@ struct InnerView<M: Model> {
 
     /// The current time on the fake clock, if it is enabled.
     fake_clock: Instant,
+
+    /// Captured output, if active.
+    capture_buffer: Option<Arc<Mutex<String>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -659,17 +655,13 @@ enum State {
 }
 
 impl<M: Model> InnerView<M> {
-    fn new(
-        model: M,
-        write_to: WriteTo,
-        options: Options,
-        width_strategy: WidthStrategy,
-    ) -> InnerView<M> {
+    fn new(model: M, options: Options) -> InnerView<M> {
+        let width_strategy = options.destination.width_strategy();
         InnerView {
+            capture_buffer: None,
             fake_clock: Instant::now(),
             model,
             options,
-            out: write_to,
             state: State::None,
             suspended: false,
             width_strategy,
@@ -680,7 +672,7 @@ impl<M: Model> InnerView<M> {
         let _ = self.hide();
         let final_message = self.model.final_message();
         if !final_message.is_empty() {
-            self.out.write_str(&format!("{}\n", final_message));
+            self.write_output(&format!("{}\n", final_message));
         }
         self.model
     }
@@ -688,7 +680,7 @@ impl<M: Model> InnerView<M> {
     fn abandon(mut self) -> io::Result<M> {
         match self.state {
             State::ProgressDrawn { .. } => {
-                self.out.write_str("\n");
+                self.write_output("\n");
             }
             State::IncompleteLine | State::None | State::Printed { .. } => (),
         }
@@ -734,8 +726,7 @@ impl<M: Model> InnerView<M> {
             buf.push_str(ansi::DISABLE_LINE_WRAP);
             buf.push_str(ansi::CLEAR_TO_END_OF_SCREEN);
             buf.push_str(rendered);
-            self.out.write_str(&buf);
-            self.out.flush();
+            self.write_output(&buf);
             self.state = State::ProgressDrawn {
                 since: now,
                 cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
@@ -760,13 +751,12 @@ impl<M: Model> InnerView<M> {
     fn hide(&mut self) -> io::Result<()> {
         match self.state {
             State::ProgressDrawn { cursor_y, .. } => {
-                self.out.write_str(&format!(
+                self.write_output(&format!(
                     "{}{}{}",
                     ansi::up_n_lines_and_home(cursor_y),
                     ansi::CLEAR_TO_END_OF_SCREEN,
                     ansi::ENABLE_LINE_WRAP,
                 ));
-                self.out.flush();
                 self.state = State::None;
             }
             State::None | State::IncompleteLine | State::Printed { .. } => {}
@@ -795,8 +785,7 @@ impl<M: Model> InnerView<M> {
         } else {
             State::IncompleteLine
         };
-        self.out.write_bytes(buf);
-        self.out.flush();
+        self.write_output(&String::from_utf8(buf.to_owned()).unwrap());
         Ok(buf.len())
     }
 
@@ -804,6 +793,30 @@ impl<M: Model> InnerView<M> {
     fn set_fake_clock(&mut self, fake_clock: Instant) {
         assert!(self.options.fake_clock, "fake clock is not enabled");
         self.fake_clock = fake_clock;
+    }
+
+    fn write_output(&mut self, buf: &str) {
+        if let Some(capture) = &mut self.capture_buffer {
+            capture.lock().push_str(buf);
+        } else {
+            match &mut self.options.destination {
+                Destination::Stdout => {
+                    print!("{}", buf);
+                    io::stdout().flush().unwrap();
+                }
+                Destination::Stderr => {
+                    eprint!("{}", buf);
+                    io::stderr().flush().unwrap();
+                }
+            }
+        }
+    }
+
+    fn capture_output(&mut self) -> Arc<Mutex<String>> {
+        let buf = Arc::new(Mutex::new(String::new()));
+        self.width_strategy = WidthStrategy::Fixed(80);
+        self.capture_buffer = Some(buf.clone());
+        buf
     }
 }
 
@@ -820,7 +833,7 @@ impl<M: Model> InnerView<M> {
 ///     .progress_enabled(false); // Don't draw bars, only print.
 /// ```
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Options {
     /// Target interval to repaint the progress bar.
     update_interval: Duration,
@@ -833,6 +846,8 @@ pub struct Options {
 
     /// Use a fake clock for testing.
     fake_clock: bool,
+
+    destination: Destination,
 }
 
 impl Options {
@@ -883,50 +898,63 @@ impl Options {
     pub fn fake_clock(self, fake_clock: bool) -> Options {
         Options { fake_clock, ..self }
     }
+
+    /// Set whether progress bars are drawn to stdout, stderr, or an internal capture buffer.
+    ///
+    /// [Destination::Stdout] is the default.
+    ///
+    /// [Destination::Stderr] may be useful for programs that expect stdout to be redirected
+    /// to a file and that want to draw progress output that is not captured by the
+    /// redirection.
+    pub fn destination(self, destination: Destination) -> Options {
+        Options {
+            destination,
+            ..self
+        }
+    }
 }
 
 impl Default for Options {
     /// Create default reasonable view options.
     ///
-    /// The update interval and print holdoff are 100ms, and the progress bar is enabled.
+    /// The update interval and print holdoff are 100ms, the progress bar is enabled,
+    /// and output is sent to stdout.
     fn default() -> Options {
         Options {
             update_interval: Duration::from_millis(100),
             print_holdoff: Duration::from_millis(100),
             progress_enabled: true,
             fake_clock: false,
+            destination: Destination::Stdout,
         }
     }
 }
 
 /// Destinations for progress bar output.
-enum WriteTo {
+#[derive(Debug, Clone)]
+pub enum Destination {
+    /// Draw to stdout.
     Stdout,
+    /// Draw to stderr.
     Stderr,
-    Write(Box<dyn Write + Send + 'static>),
 }
 
-impl WriteTo {
-    fn write_str(&mut self, buf: &str) {
+impl Destination {
+    fn is_possible(&self) -> bool {
         match self {
-            WriteTo::Stdout => print!("{}", buf),
-            WriteTo::Stderr => eprint!("{}", buf),
-            WriteTo::Write(w) => write!(w, "{}", buf).unwrap(),
+            Destination::Stdout => {
+                atty::is(atty::Stream::Stdout) && !is_dumb_term() && ansi::enable_windows_ansi()
+            }
+            Destination::Stderr => {
+                atty::is(atty::Stream::Stderr) && !is_dumb_term() && ansi::enable_windows_ansi()
+            }
         }
     }
 
-    fn write_bytes(&mut self, buf: &[u8]) {
+    fn width_strategy(&self) -> WidthStrategy {
         match self {
-            WriteTo::Stdout | WriteTo::Stderr => self.write_str(&String::from_utf8_lossy(buf)),
-            WriteTo::Write(w) => w.write_all(buf).unwrap(),
-        }
-    }
-
-    fn flush(&mut self) {
-        match self {
-            WriteTo::Stdout => io::stdout().flush().unwrap(),
-            WriteTo::Stderr => io::stderr().flush().unwrap(),
-            WriteTo::Write(w) => w.flush().unwrap(),
+            Destination::Stdout => WidthStrategy::Stdout,
+            Destination::Stderr => WidthStrategy::Stderr,
         }
     }
 }
