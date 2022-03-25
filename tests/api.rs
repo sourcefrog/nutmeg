@@ -6,7 +6,7 @@ use std::io::Write;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use nutmeg::{Options, View};
+use nutmeg::{Destination, Options, View};
 
 struct MultiLineModel {
     i: usize,
@@ -21,9 +21,9 @@ impl nutmeg::Model for MultiLineModel {
 #[test]
 fn draw_progress_once() {
     let model = MultiLineModel { i: 0 };
-    let options = Options::default();
+    let options = Options::default().destination(Destination::Capture);
     let view = nutmeg::View::new(model, options);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     view.update(|model| model.i = 1);
     drop(view);
@@ -37,8 +37,8 @@ fn draw_progress_once() {
 #[test]
 fn abandoned_bar_is_not_erased() {
     let model = MultiLineModel { i: 0 };
-    let view = View::new(model, Options::default());
-    let output = view.capture_output();
+    let view = View::new(model, Options::default().destination(Destination::Capture));
+    let output = view.captured_output();
 
     view.update(|model| model.i = 1);
     view.abandon();
@@ -59,9 +59,11 @@ fn suspend_and_resume() {
         }
     }
     let model = Model(0);
-    let options = Options::default().update_interval(Duration::ZERO);
+    let options = Options::default()
+        .destination(Destination::Capture)
+        .update_interval(Duration::ZERO);
     let view = nutmeg::View::new(model, options);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     for i in 0..=4 {
         if i == 1 {
@@ -93,9 +95,11 @@ fn suspend_and_resume() {
 #[test]
 fn disabled_progress_is_not_drawn() {
     let model = MultiLineModel { i: 0 };
-    let options = Options::default().progress_enabled(false);
+    let options = Options::default()
+        .destination(Destination::Capture)
+        .progress_enabled(false);
     let view = nutmeg::View::new(model, options);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     for i in 0..10 {
         view.update(|model| model.i = i);
@@ -108,9 +112,11 @@ fn disabled_progress_is_not_drawn() {
 #[test]
 fn disabled_progress_does_not_block_print() {
     let model = MultiLineModel { i: 0 };
-    let options = Options::default().progress_enabled(false);
+    let options = Options::default()
+        .destination(Destination::Capture)
+        .progress_enabled(false);
     let mut view = nutmeg::View::new(model, options);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     for i in 0..2 {
         view.update(|model| model.i = i);
@@ -133,9 +139,9 @@ fn default_width_when_not_on_stdout() {
         }
     }
     let model = Model();
-    let options = Options::default();
+    let options = Options::default().destination(Destination::Capture);
     let view = nutmeg::View::new(model, options);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     view.update(|_model| ());
     drop(view);
@@ -163,12 +169,13 @@ fn rate_limiting_with_fake_clock() {
         update_count: 0,
     };
     let options = Options::default()
+        .destination(Destination::Capture)
         .fake_clock(true)
         .update_interval(Duration::from_millis(1));
     let mut fake_clock = Instant::now();
     let view = nutmeg::View::new(model, options);
     view.set_fake_clock(fake_clock);
-    let output = view.capture_output();
+    let output = view.captured_output();
 
     // Any number of updates, but until the clock ticks only one will be drawn.
     for _i in 0..10 {

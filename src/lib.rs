@@ -172,8 +172,8 @@ Not released yet.
   that constructs a [Options], as they will probably want to consistently
   write to either stdout or stderr.
 
-* New: Output can be captured for inspection in tests using
-  [View::capture_output].
+* New: Output can be captured for inspection in tests using [Options::destination],
+  [Destination::Capture], and [View::captured_output].
 
 ## 0.1.1
 
@@ -559,9 +559,8 @@ impl<M: Model> View<M> {
             .expect("writing message");
     }
 
-    /// Configure the view to capture output to a string rather than writing to the
-    /// destination, and return a buffer from which the output can later
-    /// be inspected.
+    /// If the view's destination is [Destination::Capture], returns the buffer
+    /// of captured output. Panics if the destination is not [Destination::Capture].
     ///
     /// The buffer is returned in an Arc so that it remains valid after the View
     /// is dropped.
@@ -571,15 +570,16 @@ impl<M: Model> View<M> {
     /// # Example
     ///
     /// ```
-    /// use nutmeg::{Options, View};
+    /// use nutmeg::{Destination, Options, View};
     ///
-    /// let view = View::new(0, Options::default());
-    /// let output = view.capture_output();
+    /// let view = View::new(0, Options::default().destination(Destination::Capture));
+    /// let output = view.captured_output();
     /// view.message("Captured message\n");
+    /// drop(view);
     /// assert_eq!(output.lock().as_str(), "Captured message\n");
     /// ```
-    pub fn capture_output(&self) -> Arc<Mutex<String>> {
-        self.inner.lock().as_mut().unwrap().capture_output()
+    pub fn captured_output(&self) -> Arc<Mutex<String>> {
+        self.inner.lock().as_mut().unwrap().captured_output()
     }
 }
 
@@ -657,8 +657,13 @@ enum State {
 impl<M: Model> InnerView<M> {
     fn new(model: M, options: Options) -> InnerView<M> {
         let width_strategy = options.destination.width_strategy();
+        let capture_buffer = if options.destination == Destination::Capture {
+            Some(Arc::new(Mutex::new(String::new())))
+        } else {
+            None
+        };
         InnerView {
-            capture_buffer: None,
+            capture_buffer,
             fake_clock: Instant::now(),
             model,
             options,
@@ -808,15 +813,22 @@ impl<M: Model> InnerView<M> {
                     eprint!("{}", buf);
                     io::stderr().flush().unwrap();
                 }
+                Destination::Capture => {
+                    self.capture_buffer
+                        .as_mut()
+                        .expect("capture buffer allocated")
+                        .lock()
+                        .push_str(buf);
+                }
             }
         }
     }
 
-    fn capture_output(&mut self) -> Arc<Mutex<String>> {
-        let buf = Arc::new(Mutex::new(String::new()));
-        self.width_strategy = WidthStrategy::Fixed(80);
-        self.capture_buffer = Some(buf.clone());
-        buf
+    fn captured_output(&mut self) -> Arc<Mutex<String>> {
+        self.capture_buffer
+            .as_ref()
+            .expect("capture buffer allocated")
+            .clone()
     }
 }
 
@@ -931,12 +943,18 @@ impl Default for Options {
 }
 
 /// Destinations for progress bar output.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Destination {
     /// Draw to stdout.
     Stdout,
     /// Draw to stderr.
     Stderr,
+    /// Draw to an internal capture buffer, which can be retrieved with [View::captured_output].
+    ///
+    /// This is intended for testing.
+    ///
+    /// A width of 80 columns is used.
+    Capture,
 }
 
 impl Destination {
@@ -948,6 +966,7 @@ impl Destination {
             Destination::Stderr => {
                 atty::is(atty::Stream::Stderr) && !is_dumb_term() && ansi::enable_windows_ansi()
             }
+            Destination::Capture => true,
         }
     }
 
@@ -955,6 +974,7 @@ impl Destination {
         match self {
             Destination::Stdout => WidthStrategy::Stdout,
             Destination::Stderr => WidthStrategy::Stderr,
+            Destination::Capture => WidthStrategy::Fixed(80),
         }
     }
 }
