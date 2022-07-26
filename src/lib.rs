@@ -175,6 +175,9 @@ Not released yet.
 * New: Output can be captured for inspection in tests using [Options::destination],
   [Destination::Capture], and [View::captured_output].
 
+* Improved: Nutmeg avoids redrawing if the model renders identical output to what
+  is already displayed, to avoid flicker.
+
 ## 0.1.1
 
 Released 2022-03-22
@@ -636,17 +639,19 @@ struct InnerView<M: Model> {
     capture_buffer: Option<Arc<Mutex<String>>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum State {
     /// Progress is not visible and nothing was recently printed.
     None,
     /// Progress bar is currently displayed.
     ProgressDrawn {
         /// Last time it was drawn.
-        last_drawn: Instant,
+        last_drawn_time: Instant,
         /// Number of lines the cursor is below the line where the progress bar
         /// should next be drawn.
         cursor_y: usize,
+        /// The rendered string last drawn.
+        last_drawn_string: String,
     },
     /// Messages were written, and the progress bar is not visible.
     Printed { last_printed: Instant },
@@ -716,26 +721,43 @@ impl<M: Model> InnerView<M> {
                     return Ok(());
                 }
             }
-            State::ProgressDrawn { last_drawn, .. } => {
-                if now - last_drawn < self.options.update_interval {
+            State::ProgressDrawn {
+                last_drawn_time, ..
+            } => {
+                if now - last_drawn_time < self.options.update_interval {
                     return Ok(());
                 }
             }
         }
         if let Some(width) = self.width_strategy.width() {
-            let rendered = self.model.render(width);
-            let rendered = rendered.strip_suffix('\n').unwrap_or(&rendered);
+            let mut rendered = self.model.render(width);
+            if rendered.ends_with('\n') {
+                // Handle models that incorrectly add a trailing newline, rather than
+                // leaving a blank line. (Maybe we should just let them fix it, and
+                // be simpler?)
+                rendered.pop();
+            }
             let mut buf = String::new();
-            if let State::ProgressDrawn { cursor_y, .. } = self.state {
+            if let State::ProgressDrawn {
+                ref last_drawn_string,
+                cursor_y,
+                ..
+            } = self.state
+            {
+                if *last_drawn_string == rendered {
+                    return Ok(());
+                }
                 buf.push_str(&ansi::up_n_lines_and_home(cursor_y));
             }
             buf.push_str(ansi::DISABLE_LINE_WRAP);
             buf.push_str(ansi::CLEAR_TO_END_OF_SCREEN);
-            buf.push_str(rendered);
+            buf.push_str(&rendered);
             self.write_output(&buf);
+            let cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
             self.state = State::ProgressDrawn {
-                last_drawn: now,
-                cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
+                last_drawn_time: now,
+                last_drawn_string: rendered,
+                cursor_y,
             };
         }
         Ok(())

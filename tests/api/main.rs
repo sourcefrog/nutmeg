@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 
 use nutmeg::{Destination, Options, View};
 
+mod identical_output_suppressed;
+
 struct MultiLineModel {
     i: usize,
 }
