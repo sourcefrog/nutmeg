@@ -642,13 +642,14 @@ enum State {
     None,
     /// Progress bar is currently displayed.
     ProgressDrawn {
-        since: Instant,
+        /// Last time it was drawn.
+        last_drawn: Instant,
         /// Number of lines the cursor is below the line where the progress bar
         /// should next be drawn.
         cursor_y: usize,
     },
     /// Messages were written, and the progress bar is not visible.
-    Printed { since: Instant },
+    Printed { last_printed: Instant },
     /// An incomplete message line has been printed, so the progress bar can't
     /// be drawn until it's removed.
     IncompleteLine,
@@ -710,13 +711,13 @@ impl<M: Model> InnerView<M> {
         match self.state {
             State::IncompleteLine => return Ok(()),
             State::None => (),
-            State::Printed { since } => {
-                if now - since < self.options.print_holdoff {
+            State::Printed { last_printed } => {
+                if now - last_printed < self.options.print_holdoff {
                     return Ok(());
                 }
             }
-            State::ProgressDrawn { since, .. } => {
-                if now - since < self.options.update_interval {
+            State::ProgressDrawn { last_drawn, .. } => {
+                if now - last_drawn < self.options.update_interval {
                     return Ok(());
                 }
             }
@@ -733,7 +734,7 @@ impl<M: Model> InnerView<M> {
             buf.push_str(rendered);
             self.write_output(&buf);
             self.state = State::ProgressDrawn {
-                since: now,
+                last_drawn: now,
                 cursor_y: rendered.as_bytes().iter().filter(|b| **b == b'\n').count(),
             };
         }
@@ -785,7 +786,7 @@ impl<M: Model> InnerView<M> {
         self.hide()?;
         self.state = if buf.ends_with(b"\n") {
             State::Printed {
-                since: self.clock(),
+                last_printed: self.clock(),
             }
         } else {
             State::IncompleteLine
