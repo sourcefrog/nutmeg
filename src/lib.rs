@@ -164,7 +164,7 @@ is welcome.
 
 ## 0.1.2
 
-Not released yet.
+Released 2022-07-27
 
 * API change: Removed `View::new_stderr` and `View::write_to`. Instead, the view
   can be drawn on stderr or output can be captured using [Options::destination].

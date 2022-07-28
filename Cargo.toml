@@ -1,6 +1,6 @@
 [package]
 name = "nutmeg"
-version = "0.1.2-pre"
+version = "0.1.2"
 edition = "2018"
 description = "An unopinionated progress bar library"
 license = "MIT"
