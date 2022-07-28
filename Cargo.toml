@@ -12,7 +12,7 @@ keywords = ["progress", "progress-bar", "terminal", "ansi"]
 [dependencies]
 atty = "0.2"
 parking_lot = "0.12"
-terminal_size = "0.1"
+terminal_size = "0.2"
 yansi = "0.5"
 
 [dev-dependencies]
