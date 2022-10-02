@@ -263,6 +263,7 @@ Released 2022-03-07
 
 use std::env;
 use std::fmt::Display;
+use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -637,6 +638,11 @@ struct InnerView<M: Model> {
 
     /// Captured output, if active.
     capture_buffer: Option<Arc<Mutex<String>>>,
+
+    /// Write internal debug trace to this file, if any.
+    trace_file: Option<File>,
+
+    start_time: Instant,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -668,19 +674,35 @@ impl<M: Model> InnerView<M> {
         } else {
             None
         };
-        InnerView {
+        let trace_file = if let Ok(trace_filename) = std::env::var("NUTMEG_TRACE") {
+            Some(
+                OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(trace_filename)
+                    .expect("open nutmeg trace file"),
+            )
+        } else {
+            None
+        };
+        let mut inner_view = InnerView {
             capture_buffer,
             fake_clock: Instant::now(),
             model,
             options,
             state: State::None,
+            start_time: Instant::now(),
             suspended: false,
+            trace_file,
             width_strategy,
-        }
+        };
+        nutmeg_trace!(inner_view, "new InnerView");
+        inner_view
     }
 
     fn finish(mut self) -> M {
         let _ = self.hide();
+        nutmeg_trace!(self, "finish");
         let final_message = self.model.final_message();
         if !final_message.is_empty() {
             self.write_output(&format!("{}\n", final_message));
@@ -689,6 +711,7 @@ impl<M: Model> InnerView<M> {
     }
 
     fn abandon(mut self) -> io::Result<M> {
+        nutmeg_trace!(self, "abandon");
         match self.state {
             State::ProgressDrawn { .. } => {
                 self.write_output("\n");
@@ -709,6 +732,7 @@ impl<M: Model> InnerView<M> {
     }
 
     fn paint_progress(&mut self) -> io::Result<()> {
+        nutmeg_trace!(self, "paint_progress");
         if !self.options.progress_enabled || self.suspended {
             return Ok(());
         }
@@ -718,6 +742,7 @@ impl<M: Model> InnerView<M> {
             State::None => (),
             State::Printed { last_printed } => {
                 if now - last_printed < self.options.print_holdoff {
+                    nutmeg_trace!(self, "... still in print holdoff");
                     return Ok(());
                 }
             }
@@ -725,6 +750,7 @@ impl<M: Model> InnerView<M> {
                 last_drawn_time, ..
             } => {
                 if now - last_drawn_time < self.options.update_interval {
+                    nutmeg_trace!(self, "... progress was recently painted");
                     return Ok(());
                 }
             }
@@ -745,8 +771,14 @@ impl<M: Model> InnerView<M> {
             } = self.state
             {
                 if *last_drawn_string == rendered {
+                    nutmeg_trace!(self, "... progress message unchanged");
                     return Ok(());
                 }
+                nutmeg_trace!(
+                    self,
+                    "... erase existing {} line progress message",
+                    cursor_y
+                );
                 buf.push_str(&ansi::up_n_lines_and_home(cursor_y));
             }
             buf.push_str(ansi::DISABLE_LINE_WRAP);
@@ -759,6 +791,11 @@ impl<M: Model> InnerView<M> {
                 last_drawn_string: rendered,
                 cursor_y,
             };
+            nutmeg_trace!(
+                self,
+                "... painted progress message, state is now {:?}",
+                self.state
+            );
         }
         Ok(())
     }
@@ -779,6 +816,7 @@ impl<M: Model> InnerView<M> {
     fn hide(&mut self) -> io::Result<()> {
         match self.state {
             State::ProgressDrawn { cursor_y, .. } => {
+                nutmeg_trace!(self, "hide progress bar, {} lines", cursor_y);
                 self.write_output(&format!(
                     "{}{}{}",
                     ansi::up_n_lines_and_home(cursor_y),
@@ -802,6 +840,8 @@ impl<M: Model> InnerView<M> {
     }
 
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        nutmeg_trace!(self, "write message");
+        nutmeg_trace!(self, "... state before message is {:?}", self.state);
         if buf.is_empty() {
             return Ok(0);
         }
@@ -813,6 +853,7 @@ impl<M: Model> InnerView<M> {
         } else {
             State::IncompleteLine
         };
+        nutmeg_trace!(self, "... state is now {:?}", self.state);
         self.write_output(&String::from_utf8(buf.to_owned()).unwrap());
         Ok(buf.len())
     }
@@ -998,6 +1039,23 @@ impl Destination {
             Destination::Stdout => WidthStrategy::Stdout,
             Destination::Stderr => WidthStrategy::Stderr,
             Destination::Capture => WidthStrategy::Fixed(80),
+        }
+    }
+}
+
+/// Write a debug trace message for debugging Nutmeg itself.
+///
+/// This intentionally doesn't use Rust general `trace` or `log` frameworks so that
+/// it works without recursion when Nutmeg is itself a trace destination.
+#[macro_export]
+macro_rules! nutmeg_trace {
+    ($view:ident, $($arg:tt)*) => {
+        if cfg!(debug_assertions) {
+            if let Some(trace_file) = &mut $view.trace_file {
+                let m = format!($($arg)*);
+                let elapsed = $view.start_time.elapsed();
+                writeln!(trace_file, "{:12.3} {}", elapsed.as_secs_f64(), m).unwrap();
+            }
         }
     }
 }
