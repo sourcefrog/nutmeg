@@ -1,4 +1,4 @@
-// Copyright 2022 Martin Pool.
+// Copyright 2022-2023 Martin Pool.
 
 //! API tests for Nutmeg.
 
@@ -13,6 +13,17 @@ mod identical_output_suppressed;
 struct MultiLineModel {
     i: usize,
 }
+
+// You can construct options as a static using const fns.
+static _SOME_OPTIONS: Options = Options::new()
+    .update_interval(Duration::ZERO)
+    .print_holdoff(Duration::from_millis(20))
+    .destination(Destination::Stderr)
+    .fake_clock(false)
+    .progress_enabled(true);
+
+// Just the default options are also OK.
+static _DEFAULT_OPTIONS: Options = Options::new();
 
 impl nutmeg::Model for MultiLineModel {
     fn render(&mut self, _width: usize) -> String {

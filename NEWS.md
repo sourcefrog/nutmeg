@@ -5,8 +5,10 @@
 * New: [View::hide] temporarily hides the view, but allows it to pop back when
   the model is next updated.
 
-* [Options] members are now public so that it can be constructed as a literal
-  struct.
+* New: Better support for constructing a const or static [Options]: there's a new
+  `const fn` [Options::new] constructor and the functions to set fields are also
+  `const`.
+
 
 ## 0.1.2
 
