@@ -786,18 +786,19 @@ impl<M: Model> InnerView<M> {
 #[derive(Debug, Clone)]
 pub struct Options {
     /// Target interval to repaint the progress bar.
-    update_interval: Duration,
+    pub update_interval: Duration,
 
     /// How long to wait after printing output before drawing the progress bar again.
-    print_holdoff: Duration,
+    pub print_holdoff: Duration,
 
     /// Is the progress bar drawn at all?
-    progress_enabled: bool,
+    pub progress_enabled: bool,
 
     /// Use a fake clock for testing.
-    fake_clock: bool,
+    pub fake_clock: bool,
 
-    destination: Destination,
+    /// Write progress and messages to stdout, stderr, or a capture buffer for tests?
+    pub destination: Destination,
 }
 
 impl Options {

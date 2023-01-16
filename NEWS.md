@@ -5,6 +5,9 @@
 * New: [View::hide] temporarily hides the view, but allows it to pop back when
   the model is next updated.
 
+* [Options] members are now public so that it can be constructed as a literal
+  struct.
+
 ## 0.1.2
 
 Released 2022-07-27
