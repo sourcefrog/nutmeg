@@ -162,6 +162,11 @@ is welcome.
 
 # Changelog
 
+## Unreleased
+
+* New: [View::hide] temporarily hides the view, but allows it to pop back when
+  the model is next updated.
+
 ## 0.1.2
 
 Released 2022-07-27
@@ -483,6 +488,12 @@ impl<M: Model> View<M> {
     /// hidden until [View::resume] is called.
     pub fn suspend(&self) {
         self.inner.lock().as_mut().unwrap().suspend().unwrap()
+    }
+
+    /// Hide the progress bar if it's currently drawn, but allow it
+    /// to be redrawn when the model is next updated.
+    pub fn hide(&self) {
+        self.inner.lock().as_mut().unwrap().hide().unwrap()
     }
 
     /// Allow the progress bar to be drawn again, reversing the effect
