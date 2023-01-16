@@ -181,7 +181,8 @@ mod windows;
 
 pub mod _changelog {
     #![doc = include_str!("../NEWS.md")]
-     // so that hyperlinks work
+    #[allow(unused_imports)]
+    use super::*; // so that hyperlinks work
 }
 
 use crate::width::WidthStrategy;
