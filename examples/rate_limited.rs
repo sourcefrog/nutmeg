@@ -15,7 +15,7 @@ impl nutmeg::Model for Model {
 
 fn main() {
     for update_interval in [20, 50, 100, 250, 1000] {
-        println!("update_interval={}ms", update_interval);
+        println!("update_interval={update_interval}ms");
         let options =
             nutmeg::Options::default().update_interval(Duration::from_millis(update_interval));
         let view = nutmeg::View::new(Model { i: 0 }, options);

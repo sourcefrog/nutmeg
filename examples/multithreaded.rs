@@ -33,7 +33,7 @@ impl nutmeg::Model for Model {
         let mut s = String::new();
         let n_jobs = self.job_state.len();
         let n_complete = self.job_state.iter().filter(|j| j.complete).count();
-        writeln!(s, "{}/{} complete", n_complete, n_jobs).unwrap();
+        writeln!(s, "{n_complete}/{n_jobs} complete").unwrap();
         for (i, js) in self.job_state.iter().enumerate() {
             let remains = THREAD_WORK_MAX - js.x;
             writeln!(s, "{:3}: {}{}", i, "#".repeat(js.x), "_".repeat(remains)).unwrap();

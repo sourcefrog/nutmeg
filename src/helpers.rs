@@ -9,7 +9,7 @@ fn duration_brief(d: Duration) -> String {
     if secs >= 120 {
         format!("{} min", secs / 60)
     } else {
-        format!("{} sec", secs)
+        format!("{secs} sec")
     }
 }
 

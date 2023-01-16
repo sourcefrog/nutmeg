@@ -2,7 +2,7 @@
 
 pub fn main() {
     let view = nutmeg::View::new(
-        nutmeg::models::BasicModel::new((0, 10), |(a, b)| format!("{}/{} complete", a, b)),
+        nutmeg::models::BasicModel::new((0, 10), |(a, b)| format!("{a}/{b} complete")),
         nutmeg::Options::default(),
     );
     for _i in 0..10 {

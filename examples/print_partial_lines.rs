@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
     for i in 1..=5 {
         view.update(|model| model.i += 1);
         zz();
-        write!(view, "partial output {}... ", i)?;
+        write!(view, "partial output {i}... ")?;
         zz();
         view.update(|model| model.i += 1);
         zz();

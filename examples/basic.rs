@@ -28,11 +28,11 @@ fn main() -> std::io::Result<()> {
     for i in 0..total_work {
         view.update(|model| {
             model.i += 1;
-            model.last_file_name = format!("file{}.txt", i);
+            model.last_file_name = format!("file{i}.txt");
         });
         // 5. Interleave text output lines by writing to the view.
         if i % 10 == 3 {
-            writeln!(view, "reached {}", i)?;
+            writeln!(view, "reached {i}")?;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }

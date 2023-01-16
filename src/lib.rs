@@ -181,7 +181,7 @@ mod windows;
 
 pub mod _changelog {
     #![doc = include_str!("../NEWS.md")]
-    use super::*; // so that hyperlinks work
+     // so that hyperlinks work
 }
 
 use crate::width::WidthStrategy;
@@ -597,7 +597,7 @@ impl<M: Model> InnerView<M> {
         let _ = self.hide();
         let final_message = self.model.final_message();
         if !final_message.is_empty() {
-            self.write_output(&format!("{}\n", final_message));
+            self.write_output(&format!("{final_message}\n"));
         }
         self.model
     }
@@ -743,11 +743,11 @@ impl<M: Model> InnerView<M> {
         } else {
             match &mut self.options.destination {
                 Destination::Stdout => {
-                    print!("{}", buf);
+                    print!("{buf}");
                     io::stdout().flush().unwrap();
                 }
                 Destination::Stderr => {
-                    eprint!("{}", buf);
+                    eprint!("{buf}");
                     io::stderr().flush().unwrap();
                 }
                 Destination::Capture => {

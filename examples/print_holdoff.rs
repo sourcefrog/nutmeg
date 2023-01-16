@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     let mut view = nutmeg::View::new(0usize, options);
     for _i in 0..5 {
         for j in 0..4 {
-            writeln!(view, "message {}", j)?;
+            writeln!(view, "message {j}")?;
             thread::sleep(time::Duration::from_millis(100));
         }
         for j in 0..20 {

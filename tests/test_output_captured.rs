@@ -9,13 +9,13 @@ use std::process::Command;
 #[test]
 fn view_in_test_does_not_leak() {
     let cargo = env::var("CARGO").expect("$CARGO isn't set");
-    let output = Command::new(&cargo)
+    let output = Command::new(cargo)
         .args(["test", "--test", "captured_in_tests"])
         .output()
         .expect("failed to spawn cargo");
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     let stderr_str = String::from_utf8_lossy(&output.stderr);
-    println!("stdout:\n{}\nstderr:\n{}\n", stdout_str, stderr_str,);
+    println!("stdout:\n{stdout_str}\nstderr:\n{stderr_str}\n",);
     assert!(!stdout_str.contains("should be captured"));
     assert!(!stderr_str.contains("should be captured"));
 }

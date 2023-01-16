@@ -122,7 +122,7 @@ fn disabled_progress_does_not_block_print() {
 
     for i in 0..2 {
         view.update(|model| model.i = i);
-        writeln!(view, "print line {}", i).unwrap();
+        writeln!(view, "print line {i}").unwrap();
     }
     drop(view);
 
@@ -137,7 +137,7 @@ fn default_width_when_not_on_stdout() {
     impl nutmeg::Model for Model {
         fn render(&mut self, width: usize) -> String {
             assert_eq!(width, 80);
-            format!("width={}", width)
+            format!("width={width}")
         }
     }
     let model = Model();

@@ -21,7 +21,7 @@ pub(crate) const CLEAR_TO_END_OF_SCREEN: &str = "\x1b[0J";
 
 pub(crate) fn up_n_lines_and_home(n: usize) -> Cow<'static, str> {
     if n > 0 {
-        format!("\x1b[{}F", n).into()
+        format!("\x1b[{n}F").into()
     } else {
         MOVE_TO_START_OF_LINE.into()
     }

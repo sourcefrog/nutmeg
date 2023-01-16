@@ -14,6 +14,6 @@ impl nutmeg::Model for Model {
 fn main() {
     let mut view = nutmeg::View::new(Model {}, nutmeg::Options::default());
     for i in 1..=5 {
-        writeln!(view, "write line {}", i).unwrap();
+        writeln!(view, "write line {i}").unwrap();
     }
 }
