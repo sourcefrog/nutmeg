@@ -5,7 +5,7 @@
 * New: [View::hide] temporarily hides the view, but allows it to pop back when
   the model is next updated.
 
-* New: Better support for constructing a const or static [Options]: there's a new
+* New: [Options] can be constructed as a `static` value: there's a new
   `const fn` [Options::new] constructor and the functions to set fields are also
   `const`.
 
