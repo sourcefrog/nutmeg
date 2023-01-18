@@ -9,6 +9,8 @@
   `const fn` [Options::new] constructor and the functions to set fields are also
   `const`.
 
+* New: [View::message_bytes] as a convenience for callers who already have
+  a `[u8]` or `Bytes` or similar.
 
 ## 0.1.2
 

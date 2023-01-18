@@ -477,6 +477,27 @@ impl<M: Model> View<M> {
             .expect("writing message");
     }
 
+    /// Print a message from a byte buffer.
+    ///
+    /// This is the same as [View::message] but takes an `AsRef<[u8]>`, such as a slice.
+    ///
+    /// Most destinations will expect the contents to be UTF-8.
+    ///
+    /// ```
+    /// use nutmeg::{Options, View};
+    ///
+    /// let view = View::new("model content", Options::default());
+    /// view.message_bytes(b"hello crow\n");
+    /// ```
+    pub fn message_bytes<S: AsRef<[u8]>>(&self, message: S) {
+        self.inner
+            .lock()
+            .as_mut()
+            .unwrap()
+            .write(message.as_ref())
+            .expect("writing message");
+    }
+
     /// If the view's destination is [Destination::Capture], returns the buffer
     /// of captured output. Panics if the destination is not [Destination::Capture].
     ///
