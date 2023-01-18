@@ -530,7 +530,7 @@ impl<M: Model> io::Write for View<M> {
         self.inner.lock().as_mut().unwrap().write(buf)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
@@ -760,25 +760,21 @@ impl<M: Model> InnerView<M> {
     }
 
     fn write_output(&mut self, buf: &str) {
-        if let Some(capture) = &mut self.capture_buffer {
-            capture.lock().push_str(buf);
-        } else {
-            match &mut self.options.destination {
-                Destination::Stdout => {
-                    print!("{buf}");
-                    io::stdout().flush().unwrap();
-                }
-                Destination::Stderr => {
-                    eprint!("{buf}");
-                    io::stderr().flush().unwrap();
-                }
-                Destination::Capture => {
-                    self.capture_buffer
-                        .as_mut()
-                        .expect("capture buffer is not allocated")
-                        .lock()
-                        .push_str(buf);
-                }
+        match &mut self.options.destination {
+            Destination::Stdout => {
+                print!("{buf}");
+                io::stdout().flush().unwrap();
+            }
+            Destination::Stderr => {
+                eprint!("{buf}");
+                io::stderr().flush().unwrap();
+            }
+            Destination::Capture => {
+                self.capture_buffer
+                    .as_mut()
+                    .expect("capture buffer is not allocated")
+                    .lock()
+                    .push_str(buf);
             }
         }
     }
