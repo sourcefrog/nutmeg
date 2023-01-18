@@ -749,7 +749,7 @@ impl<M: Model> InnerView<M> {
         } else {
             State::IncompleteLine
         };
-        self.write_output(&String::from_utf8(buf.to_owned()).unwrap());
+        self.write_output(std::str::from_utf8(buf).expect("message is not UTF-8"));
         Ok(buf.len())
     }
 
@@ -775,7 +775,7 @@ impl<M: Model> InnerView<M> {
                 Destination::Capture => {
                     self.capture_buffer
                         .as_mut()
-                        .expect("capture buffer allocated")
+                        .expect("capture buffer is not allocated")
                         .lock()
                         .push_str(buf);
                 }
