@@ -323,13 +323,8 @@ impl<M: Model> View<M> {
         if !options.destination.is_possible() {
             options.progress_enabled = false;
         }
-        View::from_inner(InnerView::new(model, options))
-    }
-
-    /// Private constructor from an InnerView.
-    fn from_inner(inner_view: InnerView<M>) -> View<M> {
         View {
-            inner: Mutex::new(Some(inner_view)),
+            inner: Mutex::new(Some(InnerView::new(model, options))),
         }
     }
 
