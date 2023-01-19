@@ -588,10 +588,9 @@ enum State {
 
 impl<M: Model> InnerView<M> {
     fn new(model: M, options: Options) -> InnerView<M> {
-        let capture_buffer = if options.destination == Destination::Capture {
-            Some(Arc::new(Mutex::new(String::new())))
-        } else {
-            None
+        let capture_buffer = match options.destination {
+            Destination::Capture => Some(Arc::new(Mutex::new(String::new()))),
+            _ => None,
         };
         InnerView {
             capture_buffer,
