@@ -185,8 +185,6 @@ pub mod _changelog {
     use super::*; // so that hyperlinks work
 }
 
-use crate::width::WidthStrategy;
-
 pub use crate::helpers::*;
 
 /// An application-defined type that holds whatever state is relevant to the
@@ -560,9 +558,6 @@ struct InnerView<M: Model> {
 
     options: Options,
 
-    /// How to determine the terminal width before output is rendered.
-    width_strategy: WidthStrategy,
-
     /// The current time on the fake clock, if it is enabled.
     fake_clock: Instant,
 
@@ -593,7 +588,6 @@ enum State {
 
 impl<M: Model> InnerView<M> {
     fn new(model: M, options: Options) -> InnerView<M> {
-        let width_strategy = options.destination.width_strategy();
         let capture_buffer = if options.destination == Destination::Capture {
             Some(Arc::new(Mutex::new(String::new())))
         } else {
@@ -606,7 +600,6 @@ impl<M: Model> InnerView<M> {
             options,
             state: State::None,
             suspended: false,
-            width_strategy,
         }
     }
 
@@ -660,7 +653,7 @@ impl<M: Model> InnerView<M> {
                 }
             }
         }
-        if let Some(width) = self.width_strategy.width() {
+        if let Some(width) = self.options.destination.width() {
             let mut rendered = self.model.render(width);
             if rendered.ends_with('\n') {
                 // Handle models that incorrectly add a trailing newline, rather than
@@ -940,11 +933,11 @@ impl Destination {
         }
     }
 
-    fn width_strategy(&self) -> WidthStrategy {
+    fn width(&self) -> Option<usize> {
         match self {
-            Destination::Stdout => WidthStrategy::Stdout,
-            Destination::Stderr => WidthStrategy::Stderr,
-            Destination::Capture => WidthStrategy::Fixed(80),
+            Destination::Stdout => width::stdout_width(),
+            Destination::Stderr => width::stderr_width(),
+            Destination::Capture => Some(80),
         }
     }
 }
