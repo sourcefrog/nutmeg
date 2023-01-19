@@ -1,4 +1,4 @@
-//! Example of [nutmeg::View::hide].
+//! Example of [nutmeg::View::clear].
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -21,7 +21,7 @@ fn main() {
         sleep(Duration::from_millis(600));
 
         // bar disappears, but will reappear on the next update.
-        view.hide();
+        view.clear();
         sleep(Duration::from_millis(600));
     }
 }

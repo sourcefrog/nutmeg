@@ -387,10 +387,10 @@ impl<M: Model> View<M> {
         self.inner.lock().as_mut().unwrap().suspend().unwrap()
     }
 
-    /// Hide the progress bar if it's currently drawn, but allow it
+    /// Remove the progress bar if it's currently drawn, but allow it
     /// to be redrawn when the model is next updated.
-    pub fn hide(&self) {
-        self.inner.lock().as_mut().unwrap().hide().unwrap()
+    pub fn clear(&self) {
+        self.inner.lock().as_mut().unwrap().clear().unwrap()
     }
 
     /// Allow the progress bar to be drawn again, reversing the effect
@@ -603,7 +603,7 @@ impl<M: Model> InnerView<M> {
     }
 
     fn finish(mut self) -> M {
-        let _ = self.hide();
+        let _ = self.clear();
         let final_message = self.model.final_message();
         if !final_message.is_empty() {
             self.write_output(&format!("{final_message}\n"));
@@ -689,7 +689,7 @@ impl<M: Model> InnerView<M> {
     /// Hide the progress bar and leave it hidden until it is resumed.
     fn suspend(&mut self) -> io::Result<()> {
         self.suspended = true;
-        self.hide()
+        self.clear()
     }
 
     fn resume(&mut self) -> io::Result<()> {
@@ -699,7 +699,7 @@ impl<M: Model> InnerView<M> {
 
     /// Clear the progress bars off the screen, leaving it ready to
     /// print other output.
-    fn hide(&mut self) -> io::Result<()> {
+    fn clear(&mut self) -> io::Result<()> {
         match self.state {
             State::ProgressDrawn { cursor_y, .. } => {
                 self.write_output(&format!(
@@ -728,7 +728,7 @@ impl<M: Model> InnerView<M> {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.hide()?;
+        self.clear()?;
         self.state = if buf.ends_with(b"\n") {
             State::Printed {
                 last_printed: self.clock(),
