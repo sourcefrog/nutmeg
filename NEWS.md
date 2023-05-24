@@ -1,6 +1,8 @@
 # Nutmeg Changelog
 
-## Unreleased
+## 0.1.3
+
+Released 2023-05-24
 
 * New: [View::clear] temporarily removes the progress view if it is drawn, but
   allows it to pop back when the model is next updated.
@@ -106,4 +108,3 @@ Released 2022-03-07
 * Write messages "under" the progress bar with `writeln!(view, ...)`. The
   bar is automatically suspended and restored. If the message has no final
   newline, the bar remains suspended until the line is completed.
-
