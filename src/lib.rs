@@ -135,6 +135,53 @@ The `examples/bench.rs` sends updates as fast as possible to a model containing 
 single `u64`, from a single thread. As of 2022-03-22, on a 2019 Core i9 Macbook Pro,
 it takes about 500ms to send 10e6 updates, or 50ns/update.
 
+# Integration with `tracing`
+
+Nutmeg can be used to draw progress bars in a terminal interleaved with
+[tracing](https://docs.rs/tracing/) messages. The progress bar is automatically
+temporarily removed to show messages, and repainted after the next update,
+subject to rate limiting and the holdoff time configured in [Options].
+
+`Arc<View<M>>` implicitly implements [`tracing_subscriber::fmt::writer::MakeWriter`](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/fmt/writer/trait.MakeWriter.html)
+and so can be passed to `tracing_subscriber::fmt::layer().with_writer()`.
+
+For example:
+
+```rust
+    use std::sync::Arc;
+    use tracing::Level;
+    use tracing_subscriber::prelude::*;
+
+    struct Model { count: usize }
+    impl nutmeg::Model for Model {
+         fn render(&mut self, _width: usize) -> String { todo!() }
+    }
+
+    let model = Model {
+        count: 0,
+    };
+    let view = Arc::new(nutmeg::View::new(model, nutmeg::Options::new()));
+    let layer = tracing_subscriber::fmt::layer()
+        .with_ansi(true)
+        .with_writer(Arc::clone(&view))
+        .with_target(false)
+        .with_timer(tracing_subscriber::fmt::time::uptime())
+        .with_filter(tracing_subscriber::filter::LevelFilter::from_level(
+            Level::INFO,
+        ));
+    tracing_subscriber::registry().with(layer).init();
+
+    for i in 0..10 {
+        if i % 10 == 0 {
+            tracing::info!(i, "cats adored");
+        }
+        view.update(|m| m.count += 1);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+```
+
+See `examples/tracing` for a runnable example.
+
 # Project status
 
 Nutmeg is a young library. Although the API will not break gratuitously,
@@ -512,6 +559,19 @@ impl<M: Model> View<M> {
     /// ```
     pub fn captured_output(&self) -> Arc<Mutex<String>> {
         self.inner.lock().as_mut().unwrap().captured_output()
+    }
+}
+
+impl<M: Model> io::Write for &View<M> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        self.inner.lock().as_mut().unwrap().write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
