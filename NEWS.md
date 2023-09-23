@@ -1,5 +1,9 @@
 # Nutmeg Changelog
 
+## Unreleased
+
+- Change back to `std::sync::Mutex` from `parking_lot`, to keep dependencies smaller.
+
 ## 0.1.4
 
 Released 2023-09-23

@@ -28,7 +28,7 @@ fn identical_output_suppressed() {
 
     // No erasure commands, just a newline after the last painted view.
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0Jhundreds=0\x1b[1G\x1b[?7l\x1b[0Jhundreds=1\n"
     );
 }

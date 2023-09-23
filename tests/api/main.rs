@@ -42,7 +42,7 @@ fn draw_progress_once() {
     drop(view);
 
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0J  count: 1\n    bar: *\x1b[1F\x1b[0J\x1b[?7h"
     );
 }
@@ -58,7 +58,7 @@ fn abandoned_bar_is_not_erased() {
 
     // No erasure commands, just a newline after the last painted view.
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0J  count: 1\n    bar: *\n"
     );
 }
@@ -96,7 +96,7 @@ fn suspend_and_resume() {
     //   it's resumed, so 2 is then painted.
     // * 3 and 4 are painted in the usual way.
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0JXX: 0\
         \x1b[1G\x1b[0J\x1b[?7h\
         \x1b[?7l\x1b[0JXX: 2\
@@ -119,7 +119,7 @@ fn disabled_progress_is_not_drawn() {
     }
     drop(view);
 
-    assert_eq!(output.lock().as_str(), "");
+    assert_eq!(output.lock().unwrap().as_str(), "");
 }
 
 #[test]
@@ -137,7 +137,10 @@ fn disabled_progress_does_not_block_print() {
     }
     drop(view);
 
-    assert_eq!(output.lock().as_str(), "print line 0\nprint line 1\n");
+    assert_eq!(
+        output.lock().unwrap().as_str(),
+        "print line 0\nprint line 1\n"
+    );
 }
 
 /// If output is redirected, it should not be affected by the width of
@@ -160,7 +163,7 @@ fn default_width_when_not_on_stdout() {
     drop(view);
 
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0Jwidth=80\x1b[1G\x1b[0J\x1b[?7h"
     );
 }
@@ -211,7 +214,7 @@ fn rate_limiting_with_fake_clock() {
 
     drop(view);
     assert_eq!(
-        output.lock().as_str(),
+        output.lock().unwrap().as_str(),
         "\x1b[?7l\x1b[0Jupdate:1 draw:1\
         \x1b[1G\
         \x1b[?7l\x1b[0Jupdate:11 draw:2\

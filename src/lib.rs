@@ -125,7 +125,7 @@ Nutmeg's goal is that [View::update] is cheap enough that applications can call 
 fairly freely when there are small updates. The library takes care of rate-limiting
 updates to the terminal, as configured in the [Options].
 
-Each call to [View::update] will take a `parking_lot` mutex and check the
+Each call to [View::update] will take a mutex lock and check the
 system time, in addition to running the callback and some function-call overhead.
 
 The model is only rendered to a string, and the string printed to a terminal, if
@@ -213,10 +213,8 @@ is welcome.
 
 use std::fmt::Display;
 use std::io::{self, Write};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-use parking_lot::Mutex;
 
 mod ansi;
 mod destination;
@@ -407,6 +405,31 @@ impl<M: Model> View<M> {
         }
     }
 
+    /// Call this function on the locked inner view.
+    ///
+    /// If the view has been destroyed, do nothing.
+    fn call_inner<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut InnerView<M>) -> R,
+    {
+        f(self
+            .inner
+            .lock()
+            .expect("View mutex is not poisoned")
+            .as_mut()
+            .expect("View is not already destroyed"))
+    }
+
+    /// Extract the inner view, destroying this object: updates on it will
+    /// no longer succeed.
+    fn take_inner(self) -> InnerView<M> {
+        self.inner
+            .lock()
+            .expect("View mutex is not poisoned")
+            .take()
+            .expect("View is not already destroyed")
+    }
+
     /// Stop using this progress view.
     ///
     /// If the progress bar is currently visible, it will be left behind on the
@@ -416,21 +439,12 @@ impl<M: Model> View<M> {
     pub fn abandon(self) -> M {
         // Mark it as not drawn (even if it is) so that Drop will not try to
         // hide it.
-        self.inner
-            .lock()
-            .take()
-            .expect("inner state is still present")
-            .abandon()
-            .unwrap()
+        self.take_inner().abandon().expect("Abandoned view")
     }
 
     /// Erase the model from the screen (if drawn), destroy it, and return the model.
     pub fn finish(self) -> M {
-        self.inner
-            .lock()
-            .take()
-            .expect("inner state is still present")
-            .finish()
+        self.take_inner().finish()
     }
 
     /// Update the model, and possibly redraw the screen to reflect the
@@ -459,25 +473,25 @@ impl<M: Model> View<M> {
     where
         U: FnOnce(&mut M) -> R,
     {
-        self.inner.lock().as_mut().unwrap().update(update_fn)
+        self.call_inner(|inner| inner.update(update_fn))
     }
 
     /// Hide the progress bar if it's currently drawn, and leave it
     /// hidden until [View::resume] is called.
     pub fn suspend(&self) {
-        self.inner.lock().as_mut().unwrap().suspend().unwrap()
+        self.call_inner(|v| v.suspend().expect("suspend succeeds"))
     }
 
     /// Remove the progress bar if it's currently drawn, but allow it
     /// to be redrawn when the model is next updated.
     pub fn clear(&self) {
-        self.inner.lock().as_mut().unwrap().clear().unwrap()
+        self.call_inner(|v| v.clear().expect("clear succeeds"))
     }
 
     /// Allow the progress bar to be drawn again, reversing the effect
     /// of [View::suspend].
     pub fn resume(&self) {
-        self.inner.lock().as_mut().unwrap().resume().unwrap()
+        self.call_inner(|v| v.resume().expect("resume succeeds"))
     }
 
     /// Set the value of the fake clock, for testing.
@@ -486,11 +500,7 @@ impl<M: Model> View<M> {
     ///
     /// Moving the clock backwards in time may cause a panic.
     pub fn set_fake_clock(&self, fake_clock: Instant) {
-        self.inner
-            .lock()
-            .as_mut()
-            .unwrap()
-            .set_fake_clock(fake_clock)
+        self.call_inner(|v| v.set_fake_clock(fake_clock))
     }
 
     /// Inspect the view's model.
@@ -509,7 +519,7 @@ impl<M: Model> View<M> {
     where
         F: FnOnce(&mut M) -> R,
     {
-        f(&mut self.inner.lock().as_mut().unwrap().model)
+        self.call_inner(|v| f(&mut v.model))
     }
 
     /// Print a message to the view.
@@ -543,12 +553,7 @@ impl<M: Model> View<M> {
     /// view.message(format!("{} splines reticulated\n", 42));
     /// ```
     pub fn message<S: AsRef<str>>(&self, message: S) {
-        self.inner
-            .lock()
-            .as_mut()
-            .unwrap()
-            .write(message.as_ref().as_bytes())
-            .expect("writing message");
+        self.message_bytes(message.as_ref().as_bytes())
     }
 
     /// Print a message from a byte buffer.
@@ -564,12 +569,7 @@ impl<M: Model> View<M> {
     /// view.message_bytes(b"hello crow\n");
     /// ```
     pub fn message_bytes<S: AsRef<[u8]>>(&self, message: S) {
-        self.inner
-            .lock()
-            .as_mut()
-            .unwrap()
-            .write(message.as_ref())
-            .expect("writing message");
+        self.call_inner(|v| v.write(message.as_ref()).expect("write message"));
     }
 
     /// If the view's destination is [Destination::Capture], returns the buffer
@@ -591,10 +591,10 @@ impl<M: Model> View<M> {
     /// let output = view.captured_output();
     /// view.message("Captured message\n");
     /// drop(view);
-    /// assert_eq!(output.lock().as_str(), "Captured message\n");
+    /// assert_eq!(output.lock().unwrap().as_str(), "Captured message\n");
     /// ```
     pub fn captured_output(&self) -> Arc<Mutex<String>> {
-        self.inner.lock().as_mut().unwrap().captured_output()
+        self.call_inner(|v| v.captured_output())
     }
 }
 
@@ -603,7 +603,7 @@ impl<M: Model> io::Write for &View<M> {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.inner.lock().as_mut().unwrap().write(buf)
+        self.call_inner(|v| v.write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -616,7 +616,7 @@ impl<M: Model> io::Write for View<M> {
         if buf.is_empty() {
             return Ok(0);
         }
-        self.inner.lock().as_mut().unwrap().write(buf)
+        self.call_inner(|v| v.write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -629,7 +629,7 @@ impl<M: Model> Drop for View<M> {
         // Only try lock here: don't hang if it's locked or panic
         // if it's poisoned. And, do nothing if the View has already been
         // finished, in which case the contents of the Mutex will be None.
-        if let Some(mut inner_guard) = self.inner.try_lock() {
+        if let Ok(mut inner_guard) = self.inner.try_lock() {
             if let Some(inner) = Option::take(&mut inner_guard) {
                 inner.finish();
             }
@@ -858,6 +858,7 @@ impl<M: Model> InnerView<M> {
                 self.capture_buffer
                     .get_or_insert_with(|| Arc::new(Mutex::new(String::new())))
                     .lock()
+                    .expect("lock capture_buffer")
                     .push_str(buf);
             }
         }
