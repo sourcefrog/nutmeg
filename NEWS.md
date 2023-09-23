@@ -2,6 +2,8 @@
 
 ## 0.1.4
 
+Released 2023-09-23
+
 - New: Support and documentation for sending `tracing` updates through a Nutmeg view.
 
 - New: `View::new` is now `const`, so that a `static` view can be constructed in
