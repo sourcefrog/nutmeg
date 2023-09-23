@@ -4,6 +4,9 @@
 
 - New: Support and documentation for sending `tracing` updates through a Nutmeg view.
 
+- New: `View::new` is now `const`, so that a `static` view can be constructed in
+  a global variable: you no longer need to wrap them in an `Arc`. See `examples/static_view`.
+
 ## 0.1.3
 
 Released 2023-05-24

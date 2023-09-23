@@ -106,9 +106,9 @@ fn main() -> std::io::Result<()> {
             model.i += 1;
             model.last_file_name = format!("file{}.txt", i);
         });
-        // 5. Interleave text output lines by writing to the view.
+        // 5. Interleave text output lines by writing messages to the view.
         if i % 10 == 3 {
-            writeln!(view, "reached {}", i)?;
+            view.message(format!("reached {}", i));
         }
     }
 
@@ -211,7 +211,6 @@ is welcome.
 
 #![warn(missing_docs)]
 
-use std::env;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -220,6 +219,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 mod ansi;
+mod destination;
 mod helpers;
 pub mod models;
 mod width;
@@ -233,6 +233,7 @@ pub mod _changelog {
 }
 
 pub use crate::helpers::*;
+pub use destination::Destination;
 
 /// An application-defined type that holds whatever state is relevant to the
 /// progress bar, and that can render it into one or more lines of text.
@@ -336,6 +337,42 @@ where
 /// It is OK to print incomplete lines, i.e. without a final `\n`
 /// character. In this case the progress bar remains suspended
 /// until the line is completed.
+///
+/// ## Static views
+///
+/// Views can be constructed as static variables, and used from multiple threads.
+///
+/// Note that `Default::default()` is not `const` so cannot be used to construct
+/// either your model or the `Options`.
+///
+/// For example:
+/// ```
+/// static VIEW: nutmeg::View<Model> = nutmeg::View::new(Model { i: 0 }, nutmeg::Options::new());
+///
+/// struct Model {
+///     i: usize,
+/// }
+///
+/// impl nutmeg::Model for Model {
+///     fn render(&mut self, _width: usize) -> String {
+///         format!("i={}", self.i)
+///     }
+/// }
+///
+/// fn main() -> std::io::Result<()> {
+///     for i in 0..20 {
+///         VIEW.update(|model| model.i = i);
+///         if i % 5 == 0 {
+///             // Note: You cannot use writeln!() here, because its argument must be
+///             // `&mut`, but you can send messages.
+///             VIEW.message(&format!("message: i={i}\n"));
+///         }
+///         std::thread::sleep(std::time::Duration::from_millis(20));
+///     }
+///     Ok(())
+/// }
+///
+/// ```
 pub struct View<M: Model> {
     /// The real state of the view.
     ///
@@ -364,10 +401,7 @@ impl<M: Model> View<M> {
     /// This constructor arranges that output from the progress view will be
     /// captured by the Rust test framework and not leak to stdout, but
     /// detection of whether to show progress bars may not work correctly.
-    pub fn new(model: M, mut options: Options) -> View<M> {
-        if !options.destination.is_possible() {
-            options.progress_enabled = false;
-        }
+    pub const fn new(model: M, options: Options) -> View<M> {
         View {
             inner: Mutex::new(Some(InnerView::new(model, options))),
         }
@@ -539,7 +573,9 @@ impl<M: Model> View<M> {
     }
 
     /// If the view's destination is [Destination::Capture], returns the buffer
-    /// of captured output. Panics if the destination is not [Destination::Capture].
+    /// of captured output.
+    ///
+    /// Panics if the destination is not [Destination::Capture].
     ///
     /// The buffer is returned in an Arc so that it remains valid after the View
     /// is dropped.
@@ -601,10 +637,6 @@ impl<M: Model> Drop for View<M> {
     }
 }
 
-fn is_dumb_term() -> bool {
-    env::var("TERM").map_or(false, |s| s.eq_ignore_ascii_case("dumb"))
-}
-
 /// The real contents of a View, inside a mutex.
 struct InnerView<M: Model> {
     /// Current application model.
@@ -619,7 +651,7 @@ struct InnerView<M: Model> {
     options: Options,
 
     /// The current time on the fake clock, if it is enabled.
-    fake_clock: Instant,
+    fake_clock: Option<Instant>,
 
     /// Captured output, if active.
     capture_buffer: Option<Arc<Mutex<String>>>,
@@ -627,6 +659,8 @@ struct InnerView<M: Model> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum State {
+    /// Nothing has ever been painted, and the screen has not yet been initialized.
+    New,
     /// Progress is not visible and nothing was recently printed.
     None,
     /// Progress bar is currently displayed.
@@ -647,17 +681,13 @@ enum State {
 }
 
 impl<M: Model> InnerView<M> {
-    fn new(model: M, options: Options) -> InnerView<M> {
-        let capture_buffer = match options.destination {
-            Destination::Capture => Some(Arc::new(Mutex::new(String::new()))),
-            _ => None,
-        };
+    const fn new(model: M, options: Options) -> InnerView<M> {
         InnerView {
-            capture_buffer,
-            fake_clock: Instant::now(),
+            capture_buffer: None,
+            fake_clock: None,
             model,
             options,
-            state: State::None,
+            state: State::New,
             suspended: false,
         }
     }
@@ -676,7 +706,7 @@ impl<M: Model> InnerView<M> {
             State::ProgressDrawn { .. } => {
                 self.write_output("\n");
             }
-            State::IncompleteLine | State::None | State::Printed { .. } => (),
+            State::New | State::IncompleteLine | State::None | State::Printed { .. } => (),
         }
         self.state = State::None; // so that drop does not attempt to erase
         Ok(self.model)
@@ -684,21 +714,28 @@ impl<M: Model> InnerView<M> {
 
     /// Return the real or fake clock.
     fn clock(&self) -> Instant {
-        if self.options.fake_clock {
-            self.fake_clock
-        } else {
-            Instant::now()
+        self.fake_clock.unwrap_or_else(Instant::now)
+    }
+
+    fn init_destination(&mut self) {
+        if self.state == State::New {
+            if self.options.destination.initalize().is_err() {
+                // This destination doesn't want to draw progress bars, so stay off forever.
+                self.options.progress_enabled = false;
+            }
+            self.state = State::None;
         }
     }
 
     fn paint_progress(&mut self) -> io::Result<()> {
+        self.init_destination();
         if !self.options.progress_enabled || self.suspended {
             return Ok(());
         }
         let now = self.clock();
         match self.state {
             State::IncompleteLine => return Ok(()),
-            State::None => (),
+            State::New | State::None => (),
             State::Printed { last_printed } => {
                 if now - last_printed < self.options.print_holdoff {
                     return Ok(());
@@ -770,7 +807,7 @@ impl<M: Model> InnerView<M> {
                 ));
                 self.state = State::None;
             }
-            State::None | State::IncompleteLine | State::Printed { .. } => {}
+            State::None | State::New | State::IncompleteLine | State::Printed { .. } => {}
         }
         Ok(())
     }
@@ -788,6 +825,7 @@ impl<M: Model> InnerView<M> {
         if buf.is_empty() {
             return Ok(0);
         }
+        self.init_destination();
         self.clear()?;
         self.state = if buf.ends_with(b"\n") {
             State::Printed {
@@ -802,8 +840,8 @@ impl<M: Model> InnerView<M> {
 
     /// Set the value of the fake clock, for testing.
     fn set_fake_clock(&mut self, fake_clock: Instant) {
-        assert!(self.options.fake_clock, "fake clock is not enabled");
-        self.fake_clock = fake_clock;
+        assert!(self.options.fake_clock, "Options.fake_clock is not enabled");
+        self.fake_clock = Some(fake_clock);
     }
 
     fn write_output(&mut self, buf: &str) {
@@ -818,8 +856,7 @@ impl<M: Model> InnerView<M> {
             }
             Destination::Capture => {
                 self.capture_buffer
-                    .as_mut()
-                    .expect("capture buffer is not allocated")
+                    .get_or_insert_with(|| Arc::new(Mutex::new(String::new())))
                     .lock()
                     .push_str(buf);
             }
@@ -828,8 +865,7 @@ impl<M: Model> InnerView<M> {
 
     fn captured_output(&mut self) -> Arc<Mutex<String>> {
         self.capture_buffer
-            .as_ref()
-            .expect("capture buffer allocated")
+            .get_or_insert_with(|| Arc::new(Mutex::new(String::new())))
             .clone()
     }
 }
@@ -961,42 +997,5 @@ impl Default for Options {
     /// This is the same as [Options::new].
     fn default() -> Options {
         Options::new()
-    }
-}
-
-/// Destinations for progress bar output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Destination {
-    /// Draw to stdout.
-    Stdout,
-    /// Draw to stderr.
-    Stderr,
-    /// Draw to an internal capture buffer, which can be retrieved with [View::captured_output].
-    ///
-    /// This is intended for testing.
-    ///
-    /// A width of 80 columns is used.
-    Capture,
-}
-
-impl Destination {
-    fn is_possible(&self) -> bool {
-        match self {
-            Destination::Stdout => {
-                atty::is(atty::Stream::Stdout) && !is_dumb_term() && ansi::enable_windows_ansi()
-            }
-            Destination::Stderr => {
-                atty::is(atty::Stream::Stderr) && !is_dumb_term() && ansi::enable_windows_ansi()
-            }
-            Destination::Capture => true,
-        }
-    }
-
-    fn width(&self) -> Option<usize> {
-        match self {
-            Destination::Stdout => width::stdout_width(),
-            Destination::Stderr => width::stderr_width(),
-            Destination::Capture => Some(80),
-        }
     }
 }
