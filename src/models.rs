@@ -287,6 +287,13 @@ where
 #[derive(Debug)]
 pub struct DisplayModel<T: Display + Debug>(pub T);
 
+impl<T: Display + Debug> DisplayModel<T> {
+    /// Construct a new model holding a value implementing `Display`.
+    pub fn new(value: T) -> DisplayModel<T> {
+        DisplayModel(value)
+    }
+}
+
 impl<T: Display + Debug> Model for DisplayModel<T> {
     fn render(&mut self, _width: usize) -> String {
         format!("{}", self.0)
