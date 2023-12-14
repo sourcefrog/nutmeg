@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 #[allow(unused)] // For docstrings
 use crate::View;
-use crate::{estimate_remaining, percent_done, Model};
+use crate::{estimate_remaining, percent_done, Model, RenderContext};
 
 /// A Nutmeg progress model that concatenates a pair of strings to render
 /// the progress bar.
@@ -58,7 +58,7 @@ impl StringPair {
 }
 
 impl Model for StringPair {
-    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         format!("{}{}", self.prefix, self.suffix)
     }
 }
@@ -126,7 +126,7 @@ impl LinearModel {
 }
 
 impl Model for LinearModel {
-    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         format!(
             "{}: {}/{}, {}, {} remaining",
             self.message,
@@ -185,7 +185,7 @@ impl UnboundedModel {
 }
 
 impl Model for UnboundedModel {
-    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         format!(
             "{}: {} in {}",
             self.message,
@@ -266,7 +266,7 @@ impl<T, R> Model for BasicModel<T, R>
 where
     R: FnMut(&mut T) -> String,
 {
-    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         (self.render_fn)(&mut self.value)
     }
 }

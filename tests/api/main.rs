@@ -151,7 +151,7 @@ fn default_width_when_not_on_stdout() {
     impl nutmeg::Model for Model {
         fn render(&mut self, context: &nutmeg::RenderContext) -> String {
             assert_eq!(context.width(), 80);
-            format!("width={width}")
+            format!("width={}", context.width())
         }
     }
     let model = Model();

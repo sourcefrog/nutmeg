@@ -1,7 +1,6 @@
 // Copyright 2023 Martin Pool.
 
-//! Context passed from the library to the render function.
-
+/// Context passed from the library to the render function.
 pub struct RenderContext {
     pub(crate) width: usize,
 }

@@ -163,7 +163,7 @@ For example:
         }
     }
 
-    let model = Model {
+    let model = CountModel {
         count: 0,
     };
     let view = Arc::new(nutmeg::View::new(model, nutmeg::Options::new()));
@@ -268,12 +268,12 @@ pub trait Model {
     /// struct Model { i: usize, total: usize }
     ///
     /// impl nutmeg::Model for Model {
-    ///     fn render(&mut self, _context: &nutmeg::Context) -> String {
+    ///     fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
     ///         format!("phase {}/{}", self.i, self.total)
     ///     }
     /// }
     /// ```
-    fn render(&mut self, context: &Context) -> String;
+    fn render(&mut self, context: &RenderContext) -> String;
 
     /// Optionally render a final message when the view is finished.
     ///
@@ -312,7 +312,7 @@ impl<T> Model for T
 where
     T: Display,
 {
-    fn render(&mut self, _context: &Context) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         self.to_string()
     }
 }
@@ -356,7 +356,7 @@ where
 /// }
 ///
 /// impl nutmeg::Model for Model {
-///     fn render(&mut self, _context: &nutmeg::Context) -> String {
+///     fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
 ///         format!("i={}", self.i)
 ///     }
 /// }
@@ -754,7 +754,7 @@ impl<M: Model> InnerView<M> {
             }
         }
         if let Some(width) = self.options.destination.width() {
-            let context = Context { width };
+            let context = RenderContext { width };
             let mut rendered = self.model.render(&context);
             if rendered.ends_with('\n') {
                 // Handle models that incorrectly add a trailing newline, rather than
