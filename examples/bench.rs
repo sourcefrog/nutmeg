@@ -4,15 +4,23 @@
 
 use std::time::Instant;
 
+struct IntModel(usize);
+
+impl nutmeg::Model for IntModel {
+    fn render(&mut self, _width: usize) -> String {
+        format!("count: {}", self.0)
+    }
+}
+
 fn main() {
     let start = Instant::now();
-    let view = nutmeg::View::new(0u64, nutmeg::Options::default());
+    let view = nutmeg::View::new(IntModel(0), nutmeg::Options::default());
     let n = 10_000_000;
     for i in 0..n {
-        view.update(|model| *model = i);
+        view.update(|IntModel(count)| *count = i);
     }
     view.message(format!(
-        "{}ms to send {} updates; average {}ns/update",
+        "{}ms to send {} updates; average {}ns/update\n",
         start.elapsed().as_millis(),
         n,
         start.elapsed().as_nanos() / n as u128,

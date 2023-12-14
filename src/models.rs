@@ -7,6 +7,7 @@
 //! requirement to use them: they only implement the public [Model] interface.
 
 use std::borrow::Cow;
+use std::fmt::{Debug, Display};
 use std::time::{Duration, Instant};
 
 #[allow(unused)] // For docstrings
@@ -86,6 +87,7 @@ impl Model for StringPair {
 ///     progress.update(|model| model.increment(1));
 /// }
 /// ```
+#[derive(Debug)]
 pub struct LinearModel {
     done: usize,
     total: usize,
@@ -107,6 +109,16 @@ impl LinearModel {
     /// Update the total amount of expected work.
     pub fn set_total(&mut self, total: usize) {
         self.total = total
+    }
+
+    /// Get the total number of things.
+    pub fn total(&self) -> usize {
+        self.total
+    }
+
+    /// Get the number of things done so far.
+    pub fn done(&self) -> usize {
+        self.done
     }
 
     /// Update the amount of work done.
@@ -268,5 +280,15 @@ where
 {
     fn render(&mut self, _width: usize) -> String {
         (self.render_fn)(&mut self.value)
+    }
+}
+
+/// A model that holds a single value and renders it using its `Display` implementation.
+#[derive(Debug)]
+pub struct DisplayModel<T: Display + Debug>(pub T);
+
+impl<T: Display + Debug> Model for DisplayModel<T> {
+    fn render(&mut self, _width: usize) -> String {
+        format!("{}", self.0)
     }
 }

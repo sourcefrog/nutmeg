@@ -11,19 +11,21 @@
 
 use std::io::Write;
 
+use nutmeg::models::DisplayModel;
+
 #[test]
 fn view_stdout_captured() {
-    let mut view = nutmeg::View::new(String::new(), nutmeg::Options::default());
-    view.update(|model| *model = "stdout progress should be captured".into());
+    let mut view = nutmeg::View::new(DisplayModel("hello"), nutmeg::Options::default());
+    view.update(|DisplayModel(message)| *message = "stdout progress should be captured");
     writeln!(view, "stdout message should be captured").unwrap();
 }
 
 #[test]
 fn view_stderr_captured() {
     let mut view = nutmeg::View::new(
-        String::new(),
+        DisplayModel("initial"),
         nutmeg::Options::default().destination(nutmeg::Destination::Stderr),
     );
-    view.update(|model| *model = "stderr progress should be captured".into());
+    view.update(|model| model.0 = "stderr progress should be captured");
     writeln!(view, "stderr message should be captured").unwrap();
 }

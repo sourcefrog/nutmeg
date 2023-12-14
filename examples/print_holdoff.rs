@@ -11,22 +11,24 @@ use std::thread;
 use std::time;
 use std::time::Duration;
 
+use nutmeg::models::LinearModel;
+
 fn main() -> io::Result<()> {
     let options = nutmeg::Options::default()
         .print_holdoff(Duration::from_millis(1000))
         .update_interval(Duration::from_millis(0));
-    let mut view = nutmeg::View::new(0usize, options);
+    let mut view = nutmeg::View::new(LinearModel::new("Things", 50), options);
     for _i in 0..5 {
         for j in 0..4 {
             writeln!(view, "message {j}")?;
             thread::sleep(time::Duration::from_millis(100));
         }
         for j in 0..20 {
-            view.update(|state| {
+            view.update(|model| {
                 // Previous updates were applied even though
                 // they may not have been painted.
-                assert!(j == 0 || *state == (j - 1));
-                *state = j
+                assert!(j == 0 || model.done() == (j - 1));
+                model.set_done(j);
             });
             thread::sleep(time::Duration::from_millis(100));
         }

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Breaking change:** `Render` no longer has a blanket implementation for `Display`: you can no longer use a string, integer, or some object that implements `Display` as a model directly. You must instead implement `Render` explicitly.
+- **Breaking change:** `Render` no longer has a blanket implementation for `Display`: you can no longer use a string, integer, or some object that implements `Display` as a model directly. You can instead implement `Render` explicitly, or opt in to this behavior using the new `nutmeg::models::DisplayModel`.
 
   It seems that the `Display` implementation is often not a very satisfactory progress bar, and the presence of the blanket implementation causes confusing error messages when `Render` is not implemented correctly.
 

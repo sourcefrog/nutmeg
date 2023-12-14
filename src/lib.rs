@@ -487,10 +487,13 @@ impl<M: Model> View<M> {
     ///
     /// ```
     /// use nutmeg::{Options, View};
+    /// use nutmeg::models::LinearModel;
     ///
-    /// let view = View::new(10, Options::default());
-    /// view.update(|model| *model += 3);
-    /// assert_eq!(view.inspect_model(|m| *m), 13);
+    /// let mut model = LinearModel::new("Things done", 100);
+    /// model.set_done(10);
+    /// let view = View::new(model, Options::default());
+    /// view.update(|model| model.increment(3));
+    /// assert_eq!(view.inspect_model(|m| m.done()), 13);
     /// ```
     pub fn inspect_model<F, R>(&self, f: F) -> R
     where
@@ -524,10 +527,15 @@ impl<M: Model> View<M> {
     ///
     /// ```
     /// use nutmeg::{Options, View};
+    /// use nutmeg::models::LinearModel;
     ///
-    /// let view = View::new(0, Options::default());
-    /// // ...
-    /// view.message(format!("{} splines reticulated\n", 42));
+    /// let view = View::new(LinearModel::new("Splines reticulated", 100), Options::default());
+    /// for i in 0..20 {
+    ///     view.update(|model| model.increment(1));
+    ///     if i == 12 {
+    ///         view.message("Some quality splines here!\n");
+    ///     }
+    /// }
     /// ```
     pub fn message<S: AsRef<str>>(&self, message: S) {
         self.message_bytes(message.as_ref().as_bytes())
@@ -541,8 +549,9 @@ impl<M: Model> View<M> {
     ///
     /// ```
     /// use nutmeg::{Options, View};
+    /// use nutmeg::models::LinearModel;
     ///
-    /// let view = View::new("model content", Options::default());
+    /// let view = View::new(LinearModel::new("Things done", 100), Options::default());
     /// view.message_bytes(b"hello crow\n");
     /// ```
     pub fn message_bytes<S: AsRef<[u8]>>(&self, message: S) {
@@ -563,8 +572,11 @@ impl<M: Model> View<M> {
     ///
     /// ```
     /// use nutmeg::{Destination, Options, View};
+    /// use nutmeg::models::DisplayModel;
     ///
-    /// let view = View::new(0, Options::default().destination(Destination::Capture));
+    /// let view = View::new(
+    ///     DisplayModel("unchanging message"),
+    ///     Options::default().destination(Destination::Capture));
     /// let output = view.captured_output();
     /// view.message("Captured message\n");
     /// drop(view);
