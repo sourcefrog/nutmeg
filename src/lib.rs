@@ -20,12 +20,11 @@ processed, the amount of data transmitted or received, the currently active task
 
 The Model can be any of these things, from simplest to most powerful:
 
-1. Any type that implements [std::fmt::Display], such as a String or integer.
-2. One of the provided [models].
-3. An application-defined struct (or enum or other type) that implements [Model].
+1. One of the provided [models].
+2. An application-defined struct (or enum or other type) that implements [Model].
 
 The model is responsible for rendering itself into a String, optionally with ANSI styling,
-by implementing [Model::render] (or [std::fmt::Display]).  Applications might
+by implementing [Model::render].  Applications might
 choose to use any of the Rust crates that can render ANSI control codes into a
 string, such as yansi.
 
@@ -211,7 +210,6 @@ is welcome.
 
 #![warn(missing_docs)]
 
-use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -289,29 +287,6 @@ pub trait Model {
     /// [View::abandon].
     fn final_message(&mut self) -> String {
         String::new()
-    }
-}
-
-/// Blanket implementation of Model for Display.
-///
-/// `self` is converted to a display string without regard for
-/// the terminal width.
-///
-/// This allows direct use of e.g. a String or integer as a model
-/// for very basic progress indications.
-///
-/// ```
-/// use nutmeg::{Options, View};
-///
-/// let view = View::new(0, Options::default());
-/// view.update(|model| *model += 1);
-/// ```
-impl<T> Model for T
-where
-    T: Display,
-{
-    fn render(&mut self, _width: usize) -> String {
-        self.to_string()
     }
 }
 

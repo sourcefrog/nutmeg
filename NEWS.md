@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Breaking change:** `Render` no longer has a blanket implementation for `Display`: you can no longer use a string, integer, or some object that implements `Display` as a model directly. You must instead implement `Render` explicitly.
+
+  It seems that the `Display` implementation is often not a very satisfactory progress bar, and the presence of the blanket implementation causes confusing error messages when `Render` is not implemented correctly.
+
 - Change back to `std::sync::Mutex` from `parking_lot`, to keep dependencies smaller.
 
 ## 0.1.4
