@@ -26,7 +26,7 @@ static _SOME_OPTIONS: Options = Options::new()
 static _DEFAULT_OPTIONS: Options = Options::new();
 
 impl nutmeg::Model for MultiLineModel {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!("  count: {}\n    bar: {}\n", self.i, "*".repeat(self.i),)
     }
 }
@@ -67,7 +67,7 @@ fn abandoned_bar_is_not_erased() {
 fn suspend_and_resume() {
     struct Model(usize);
     impl nutmeg::Model for Model {
-        fn render(&mut self, _width: usize) -> String {
+        fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
             format!("XX: {}", self.0)
         }
     }
@@ -149,8 +149,8 @@ fn disabled_progress_does_not_block_print() {
 fn default_width_when_not_on_stdout() {
     struct Model();
     impl nutmeg::Model for Model {
-        fn render(&mut self, width: usize) -> String {
-            assert_eq!(width, 80);
+        fn render(&mut self, context: &nutmeg::RenderContext) -> String {
+            assert_eq!(context.width(), 80);
             format!("width={width}")
         }
     }
@@ -175,7 +175,7 @@ fn rate_limiting_with_fake_clock() {
         update_count: usize,
     }
     impl nutmeg::Model for Model {
-        fn render(&mut self, _width: usize) -> String {
+        fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
             self.draw_count += 1;
             format!("update:{} draw:{}", self.update_count, self.draw_count)
         }

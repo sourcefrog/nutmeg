@@ -6,7 +6,7 @@ use std::io::Write;
 struct Model {}
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         unreachable!("Model::render should never be called, since the progress bar is disabled");
     }
 }

@@ -10,7 +10,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         let mut s = format!("i={} | ", self.i);
         let ii = self.i % self.width;
         for _ in 0..ii {

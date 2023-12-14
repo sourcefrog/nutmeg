@@ -88,7 +88,7 @@ struct Model {
 
 // 2. Define how to render the progress bar as a String.
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!("{}/{}: {}", self.i, self.total, self.last_file_name)
     }
 }
@@ -149,12 +149,18 @@ For example:
 
 ```rust
     use std::sync::Arc;
+
     use tracing::Level;
     use tracing_subscriber::prelude::*;
 
-    struct Model { count: usize }
-    impl nutmeg::Model for Model {
-         fn render(&mut self, _width: usize) -> String { todo!() }
+    struct CountModel {
+        count: usize,
+    }
+
+    impl nutmeg::Model for CountModel {
+        fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
+            format!("Count: {}", self.count)
+        }
     }
 
     let model = Model {
@@ -217,6 +223,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 mod ansi;
+mod context;
 mod destination;
 mod helpers;
 pub mod models;
@@ -231,6 +238,7 @@ pub mod _changelog {
     use super::*; // so that hyperlinks work
 }
 
+pub use crate::context::RenderContext;
 pub use crate::destination::Destination;
 pub use crate::helpers::*;
 pub use crate::options::Options;
@@ -246,14 +254,8 @@ pub trait Model {
     /// Future versions of this library may call this function from a different
     /// thread.
     ///
-    /// The `width` argument advises the model rendering code of the width of
-    /// the terminal. The `render` implementation may make us of this to, for
-    /// example, draw a full-width progress bar, or to selectively truncate
-    /// sections within the line.
-    ///
-    /// The model may also ignore the `width` parameter and return a string
-    /// of any width, in which case it will be truncated to fit on the
-    /// screen.
+    /// The [RenderContext] argument can be used by the render function to get
+    /// additional information such as the width of the screen.
     ///
     /// The rendered version may contain ANSI escape sequences for coloring,
     /// etc, but should not move the cursor.
@@ -266,12 +268,12 @@ pub trait Model {
     /// struct Model { i: usize, total: usize }
     ///
     /// impl nutmeg::Model for Model {
-    ///     fn render(&mut self, _width: usize) -> String {
+    ///     fn render(&mut self, _context: &nutmeg::Context) -> String {
     ///         format!("phase {}/{}", self.i, self.total)
     ///     }
     /// }
     /// ```
-    fn render(&mut self, width: usize) -> String;
+    fn render(&mut self, context: &Context) -> String;
 
     /// Optionally render a final message when the view is finished.
     ///
@@ -310,7 +312,7 @@ impl<T> Model for T
 where
     T: Display,
 {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &Context) -> String {
         self.to_string()
     }
 }
@@ -354,7 +356,7 @@ where
 /// }
 ///
 /// impl nutmeg::Model for Model {
-///     fn render(&mut self, _width: usize) -> String {
+///     fn render(&mut self, _context: &nutmeg::Context) -> String {
 ///         format!("i={}", self.i)
 ///     }
 /// }
@@ -752,7 +754,8 @@ impl<M: Model> InnerView<M> {
             }
         }
         if let Some(width) = self.options.destination.width() {
-            let mut rendered = self.model.render(width);
+            let context = Context { width };
+            let mut rendered = self.model.render(&context);
             if rendered.ends_with('\n') {
                 // Handle models that incorrectly add a trailing newline, rather than
                 // leaving a blank line. (Maybe we should just let them fix it, and

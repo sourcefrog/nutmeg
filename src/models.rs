@@ -58,7 +58,7 @@ impl StringPair {
 }
 
 impl Model for StringPair {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!("{}{}", self.prefix, self.suffix)
     }
 }
@@ -126,7 +126,7 @@ impl LinearModel {
 }
 
 impl Model for LinearModel {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!(
             "{}: {}/{}, {}, {} remaining",
             self.message,
@@ -185,7 +185,7 @@ impl UnboundedModel {
 }
 
 impl Model for UnboundedModel {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!(
             "{}: {} in {}",
             self.message,
@@ -266,7 +266,7 @@ impl<T, R> Model for BasicModel<T, R>
 where
     R: FnMut(&mut T) -> String,
 {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         (self.render_fn)(&mut self.value)
     }
 }

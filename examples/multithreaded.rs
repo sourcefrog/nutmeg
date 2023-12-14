@@ -29,7 +29,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         let mut s = String::new();
         let n_jobs = self.job_state.len();
         let n_complete = self.job_state.iter().filter(|j| j.complete).count();
