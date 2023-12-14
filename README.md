@@ -33,7 +33,7 @@ struct Model {
 
 // 2. Define how to render the progress bar as a String.
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &RenderContext) -> String {
         format!("{}/{}: {}", self.i, self.total, self.last_file_name)
     }
 }

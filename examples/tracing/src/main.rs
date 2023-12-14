@@ -41,7 +41,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         let spin = match self.count % 4 {
             0 => "|",
             1 => "/",

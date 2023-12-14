@@ -1,5 +1,6 @@
-//! The render function is passed the terminal width and can use it to make things
-//! fit nicely.
+//! The render function is passed a context, from which it can get
+//! the terminal width. Using the known width it can make things
+//! fit nicely on a line.
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -10,10 +11,10 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, width: usize) -> String {
+    fn render(&mut self, context: &nutmeg::RenderContext) -> String {
         let start = format!("i={} | ", self.i);
         let end = format!(" | {:.3}s", self.start_time.elapsed().as_secs_f64());
-        let fill_len = width - start.len() - end.len();
+        let fill_len = context.width() - start.len() - end.len();
         let mut fill: Vec<u8> = vec![b'.'; fill_len];
         fill[self.i % fill_len] = b'~';
         let fill: String = String::from_utf8(fill).unwrap();

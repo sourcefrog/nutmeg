@@ -9,10 +9,10 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, width: usize) -> String {
+    fn render(&mut self, context: &nutmeg::RenderContext) -> String {
         let start = format!("i={} | ", self.i);
         let end = format!(" | {:.3}s", self.start_time.elapsed().as_secs_f64());
-        let fill_len = width - start.len() - end.len();
+        let fill_len = context.width() - start.len() - end.len();
         let mut fill: Vec<u8> = vec![b'.'; fill_len];
         fill[self.i % fill_len] = b'~';
         let fill: String = String::from_utf8(fill).unwrap();

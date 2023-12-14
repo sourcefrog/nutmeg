@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+This release has several breaking changes.
+
+- **Breaking change:** `Model::render` now takes a `RenderContext` as a parameter, rather than an integer width, to allow space to pass more information to the renderer in future. The screen width can still be obtained from the context.
+
 - Change back to `std::sync::Mutex` from `parking_lot`, to keep dependencies smaller.
 
 ## 0.1.4

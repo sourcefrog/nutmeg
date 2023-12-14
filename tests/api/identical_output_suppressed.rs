@@ -7,7 +7,7 @@ use nutmeg::{Destination, Options, View};
 struct Hundreds(usize);
 
 impl nutmeg::Model for Hundreds {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!("hundreds={}", self.0 / 100)
     }
 }

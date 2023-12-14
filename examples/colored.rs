@@ -12,7 +12,7 @@ struct Model {
 }
 
 impl nutmeg::Model for Model {
-    fn render(&mut self, _width: usize) -> String {
+    fn render(&mut self, _context: &nutmeg::RenderContext) -> String {
         format!("count: {}", Paint::yellow(self.i))
     }
 }
