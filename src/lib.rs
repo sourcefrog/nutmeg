@@ -211,6 +211,8 @@ is welcome.
 #![warn(missing_docs)]
 
 use std::io::{self, Write};
+use std::mem::take;
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -586,6 +588,18 @@ impl<M: Model> View<M> {
     pub fn captured_output(&self) -> Arc<Mutex<String>> {
         self.call_inner(|v| v.captured_output())
     }
+
+    /// Return a copy of the captured output, if any, and clear the captured output buffer.
+    ///
+    /// This is intended for use in testing, so that tests can incrementally check
+    /// the output.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if output capture is not enabled.
+    pub fn take_captured_output(&self) -> String {
+        self.call_inner(|v| v.take_captured_output())
+    }
 }
 
 impl<M: Model> io::Write for &View<M> {
@@ -853,5 +867,16 @@ impl<M: Model> InnerView<M> {
         self.capture_buffer
             .get_or_insert_with(|| Arc::new(Mutex::new(String::new())))
             .clone()
+    }
+
+    fn take_captured_output(&mut self) -> String {
+        take(
+            self.capture_buffer
+                .as_mut()
+                .expect("output capture is not enabled")
+                .lock()
+                .expect("lock capture_buffer")
+                .deref_mut(),
+        )
     }
 }

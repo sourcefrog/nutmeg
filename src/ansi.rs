@@ -63,8 +63,6 @@ pub(crate) fn insert_codes(rendered: &str, cursor_y: Option<usize>) -> (String, 
 #[cfg(test)]
 mod test {
     use std::{
-        mem::take,
-        ops::DerefMut,
         thread::sleep,
         time::{Duration, Instant},
     };
@@ -216,10 +214,9 @@ mod test {
         let model = Model();
         let options = Options::default().destination(Destination::Capture);
         let view = View::new(model, options);
-        let output = view.captured_output();
 
         view.update(|_model| ());
-        let written = output.lock().unwrap().to_owned();
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned()
@@ -228,8 +225,6 @@ mod test {
                 + CLEAR_TO_END_OF_LINE
                 + ENABLE_LINE_WRAP
         );
-
-        drop(view);
     }
 
     #[test]
@@ -245,11 +240,10 @@ mod test {
             .destination(Destination::Capture)
             .update_interval(Duration::ZERO);
         let view = View::new(model, options);
-        let output = view.captured_output();
 
         // Paint 0 before it's suspended
         view.update(|model| model.0 = 0);
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned()
@@ -262,7 +256,7 @@ mod test {
         // Now suspend; this clears the bar from the screen.
         view.suspend();
         view.update(|model| model.0 = 1);
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned() + CLEAR_TO_END_OF_SCREEN + ENABLE_LINE_WRAP
@@ -271,12 +265,12 @@ mod test {
         // * 2 is also updated into the model while the bar is suspended, but then
         //   it's resumed, so 2 is then painted.
         view.update(|model| model.0 = 2);
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = view.take_captured_output();
         assert_eq!(written, "");
 
         // Now 2 is painted when resumed.
         view.resume();
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned()
@@ -289,7 +283,7 @@ mod test {
         // * 3 and 4 are painted in the usual way.
         view.update(|model| model.0 = 3);
         view.update(|model| model.0 = 4);
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned()
@@ -304,8 +298,9 @@ mod test {
                 + ENABLE_LINE_WRAP
         );
 
+        let output = view.captured_output();
         view.abandon();
-        let written = take(output.lock().unwrap().deref_mut());
+        let written = output.lock().unwrap().to_owned();
         assert_eq!(written, "\n");
     }
 
@@ -323,16 +318,14 @@ mod test {
             .destination(Destination::Capture)
             .update_interval(Duration::ZERO);
         let view = View::new(Hundreds(0), options);
-        let output = view.captured_output();
 
         for i in 0..200 {
             // We change the model, but not in a way that will change what's displayed.
             view.update(|model| model.0 = i);
         }
-        view.abandon();
 
         // No erasure commands, just a newline after the last painted view.
-        let written = output.lock().unwrap().to_owned();
+        let written = view.take_captured_output();
         assert_eq!(
             written,
             MOVE_TO_START_OF_LINE.to_owned()
@@ -345,7 +338,6 @@ mod test {
                 + "hundreds=1"
                 + CLEAR_TO_END_OF_LINE
                 + ENABLE_LINE_WRAP
-                + "\n" // bar abandoned
         );
     }
 }
