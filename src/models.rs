@@ -227,7 +227,6 @@ fn format_duration(d: Duration) -> String {
 /// For many simple cases this avoids any need to explicitly declare a model
 /// class: instead the [View::new] call can, in-line, construct a BasicView
 /// giving an initial value and a render function.
-
 ///
 /// # Example
 /// ```
