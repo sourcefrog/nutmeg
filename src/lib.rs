@@ -229,6 +229,7 @@ pub mod _changelog {
     use super::*; // so that hyperlinks work
 }
 
+use crate::ansi::insert_codes;
 pub use crate::destination::Destination;
 pub use crate::helpers::*;
 pub use crate::options::Options;
@@ -746,22 +747,15 @@ impl<M: Model> InnerView<M> {
                 // be simpler?)
                 rendered.pop();
             }
-            let mut buf = String::new();
-            if let State::ProgressDrawn {
-                ref last_drawn_string,
-                cursor_y,
-                ..
-            } = self.state
-            {
-                if *last_drawn_string == rendered {
-                    return Ok(());
-                }
-                buf.push_str(&ansi::up_n_lines_and_home(cursor_y));
-            }
-            buf.push_str(ansi::DISABLE_LINE_WRAP);
-            buf.push_str(ansi::CLEAR_TO_END_OF_SCREEN);
-            buf.push_str(&rendered);
-            self.write_output(&buf);
+            let up_lines = match self.state {
+                State::ProgressDrawn {
+                    ref last_drawn_string,
+                    cursor_y,
+                    ..
+                } if *last_drawn_string != rendered => Some(cursor_y),
+                _ => None,
+            };
+            self.write_output(&insert_codes(&rendered, up_lines));
             let cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
             self.state = State::ProgressDrawn {
                 last_drawn_time: now,

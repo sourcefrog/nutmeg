@@ -36,3 +36,15 @@ pub(crate) fn enable_windows_ansi() -> bool {
 pub(crate) fn enable_windows_ansi() -> bool {
     true
 }
+
+pub(crate) fn insert_codes(rendered: &str, up_lines: Option<usize>) -> String {
+    let mut buf = String::with_capacity(rendered.len() + 40);
+    if let Some(up_lines) = up_lines {
+        buf.push_str(&up_n_lines_and_home(up_lines));
+    }
+    buf.push_str(DISABLE_LINE_WRAP);
+    buf.push_str(CLEAR_TO_END_OF_SCREEN);
+    buf.push_str(rendered);
+    buf.push_str(ENABLE_LINE_WRAP);
+    buf
+}
