@@ -50,5 +50,5 @@ impl Destination {
 }
 
 fn is_dumb_term() -> bool {
-    env::var("TERM").map_or(false, |s| s.eq_ignore_ascii_case("dumb"))
+    env::var("TERM").is_ok_and(|s| s.eq_ignore_ascii_case("dumb"))
 }
