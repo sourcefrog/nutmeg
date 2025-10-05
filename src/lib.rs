@@ -747,16 +747,18 @@ impl<M: Model> InnerView<M> {
                 // be simpler?)
                 rendered.pop();
             }
-            let up_lines = match self.state {
+            let cursor_y = match self.state {
                 State::ProgressDrawn {
                     ref last_drawn_string,
-                    cursor_y,
                     ..
-                } if *last_drawn_string != rendered => Some(cursor_y),
+                } if *last_drawn_string == rendered => {
+                    return Ok(());
+                }
+                State::ProgressDrawn { cursor_y, .. } => Some(cursor_y),
                 _ => None,
             };
-            self.write_output(&insert_codes(&rendered, up_lines));
-            let cursor_y = rendered.as_bytes().iter().filter(|b| **b == b'\n').count();
+            let (buf, cursor_y) = insert_codes(&rendered, cursor_y);
+            self.write_output(&buf);
             self.state = State::ProgressDrawn {
                 last_drawn_time: now,
                 last_drawn_string: rendered,

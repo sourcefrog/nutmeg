@@ -8,6 +8,8 @@
 
 - Change back to `std::sync::Mutex` from `parking_lot`, to keep dependencies smaller.
 
+- When painting multi-line progress, clear to the end of each line as it's painted, rather than previously clearing to the end of the screen. This reduces flickering on large multi-line progress bars.
+
 ## 0.1.4
 
 Released 2023-09-23
