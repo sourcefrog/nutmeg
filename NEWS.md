@@ -1,6 +1,8 @@
 # Nutmeg Changelog
 
-## Unreleased
+## 0.1.5
+
+Released 2025-10-05
 
 - **Breaking change:** `Render` no longer has a blanket implementation for `Display`: you can no longer use a string, integer, or some object that implements `Display` as a model directly. You can instead implement `Render` explicitly, or opt in to this behavior using the new `nutmeg::models::DisplayModel`.
 
