@@ -5,7 +5,9 @@
 use terminal_size::Width;
 #[cfg(unix)]
 pub(crate) fn stdout_width() -> Option<usize> {
-    terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize)
+    unsafe {
+        terminal_size::terminal_size_using_fd(1).map(|(Width(w), _)| w as usize)
+    }
 }
 
 #[cfg(windows)]
@@ -16,7 +18,9 @@ pub(crate) fn stdout_width() -> Option<usize> {
 
 #[cfg(unix)]
 pub(crate) fn stderr_width() -> Option<usize> {
-    terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize)
+    unsafe {
+        terminal_size::terminal_size_using_fd(2).map(|(Width(w), _)| w as usize)
+    }
 }
 
 #[cfg(windows)]
