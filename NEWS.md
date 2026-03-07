@@ -1,5 +1,11 @@
 # Nutmeg Changelog
 
+## 0.1.6
+
+Released 2026-03-07
+
+- Updated `terminal_size` dependency.
+
 ## 0.1.5
 
 Released 2025-10-05

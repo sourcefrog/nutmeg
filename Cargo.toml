@@ -1,6 +1,6 @@
 [package]
 name = "nutmeg"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 description = "An unopinionated progress bar library"
 license = "MIT"
@@ -12,7 +12,7 @@ rust-version = "1.75"  # Could perhaps be even older, but this is 2 years at tim
 
 [dependencies]
 atty = "0.2"
-terminal_size = "0.2"
+terminal_size = "0.4"
 yansi = "0.5"
 
 [dev-dependencies]
