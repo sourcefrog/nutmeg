@@ -1,5 +1,9 @@
 # Nutmeg Changelog
 
+## Unreleased
+
+- Use `std::io::IsTerminal` rather than the external `atty` crate.
+
 ## 0.1.6
 
 Released 2026-03-07

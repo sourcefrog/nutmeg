@@ -1,7 +1,8 @@
 // Copyright 2022-2023 Martin Pool.
 
-use std::env;
+use std::io::{stderr, IsTerminal};
 use std::result::Result;
+use std::{env, io::stdout};
 
 #[allow(unused)] // for docstrings
 use crate::View;
@@ -24,14 +25,14 @@ pub enum Destination {
 
 impl Destination {
     /// Determine if this destination is possible, and, if necessary, enable Windows ANSI support.
+    ///
+    /// Returns `Ok(())` if the destination is available, or `Err(())` if it is not.
     pub(crate) fn initalize(&self) -> Result<(), ()> {
-        if match self {
-            Destination::Stdout => {
-                atty::is(atty::Stream::Stdout) && !is_dumb_term() && ansi::enable_windows_ansi()
-            }
-            Destination::Stderr => {
-                atty::is(atty::Stream::Stderr) && !is_dumb_term() && ansi::enable_windows_ansi()
-            }
+        if is_dumb_term() {
+            Err(())
+        } else if match self {
+            Destination::Stdout => stdout().is_terminal() && ansi::enable_windows_ansi(),
+            Destination::Stderr => stderr().is_terminal() && ansi::enable_windows_ansi(),
             Destination::Capture => true,
         } {
             Ok(())
